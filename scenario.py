@@ -1,6 +1,7 @@
 from morse.builder import *
 
-gandalf = Gandalf('gandalf')
+#gandalf = Gandalf('gandalf')
+gandalf = Gandalf('body')
 #gandalf.translate(x=-6.0, z=0.2)
 
 #driver = ATRV()
@@ -13,6 +14,7 @@ keyboard.properties(Speed=3.0)
 gandalf.append(keyboard)
 
 odom = Odometry()
+odom.level( 'multiple' )
 gandalf.append( odom )
 
 semantic = SemanticCamera()
@@ -23,7 +25,8 @@ gandalf.append(semantic)
 semantic.properties(Vertical_Flip=False)
 
 force = ForceTorque()
-force.level( 'local' )
+#force.level( 'local' )
+force.level( 'multiple' )
 gandalf.append( force )
 force.add_interface( 'socket' )
 

@@ -210,6 +210,9 @@ MORSE_DATASTREAM_DICT = {
             "text": INTERFACE_DEFAULT_OUT,
             "pocolibs": ['morse.middleware.pocolibs.sensors.pom.PomSensorPoster',
                          'morse.middleware.pocolibs.sensors.pom.PomPoster']
+            },
+        "multiple": {
+            "socket": INTERFACE_DEFAULT_OUT
             }
         },
     "morse.sensors.pose.Pose": {
@@ -300,6 +303,9 @@ MORSE_DATASTREAM_DICT = {
             "socket": INTERFACE_DEFAULT_IN,
             },
         "local": {
+            "socket":INTERFACE_DEFAULT_IN,
+            },
+        "multiple": {
             "socket":INTERFACE_DEFAULT_IN,
             }
         },
