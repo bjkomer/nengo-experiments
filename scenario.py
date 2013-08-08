@@ -13,8 +13,9 @@ keyboard = Keyboard()
 keyboard.properties(Speed=3.0)
 gandalf.append(keyboard)
 
-odom = Odometry()
-odom.level( 'multiple' )
+#odom = Odometry()
+#odom.level( 'multiple' )
+odom = LinkageOdometry()
 gandalf.append( odom )
 
 semantic = SemanticCamera()
