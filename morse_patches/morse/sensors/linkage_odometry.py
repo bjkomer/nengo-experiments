@@ -83,10 +83,8 @@ class LinkageOdometry(morse.core.sensor.Sensor):
         for cur, sub in sub_tree.items():
             self.transform_dict[ cur ].update( self.object_dict[ cur ] ) # update pose information
             rel_pos = parent_pos.transformation3d_with( self.transform_dict[ cur ] ) # get pose relative to parent
-            #pos = bge.logic.getCurrentScene().objects[ cur ].worldOrientation.to_euler()
-            #angle = pos.y - parent_pos
-            #self.data.append( { 'component' : cur, 't' : angle } )
-            #self.get_angles( pos.y, sub )
+            self.data.append( { 'component' : cur, 't' : rel_pos.pitch } )
+            self.get_angles( self.transform_dict[ cur ], sub )
 
     def default_action(self):
         # Compute the position of the base within the original frame
@@ -97,11 +95,7 @@ class LinkageOdometry(morse.core.sensor.Sensor):
         for cur, sub in self.component_tree.items():
             self.transform_dict[ cur ].update( self.object_dict[ cur ] )
             pos = self.transform_dict[ cur ]
-            #pos = bge.logic.getCurrentScene().objects[ cur ].worldOrientation.to_euler()
-            #angle = pos.y # Theta
-            pos = current_pos.pitch
-            angle = pos
-            self.data.append( { 'component' : cur, 't' : angle } )
+            self.data.append( { 'component' : cur, 't' : pos.pitch } )
             self.get_angles( pos, sub )
 
         # Store the 'new' previous data
