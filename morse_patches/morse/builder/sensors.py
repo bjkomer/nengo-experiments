@@ -359,6 +359,13 @@ class VideoCamera(SensorCreator):
     def rotate(self, x=0, y=0, z=0):
         SensorCreator.rotate(self, x=y, y=z, z=x)
 
+class DVSCamera(VideoCamera):
+    def __init__(self, name=None):
+        VideoCamera.__init__(self, name, \
+                             "morse.sensors.dvs_camera.DVSCamera",\
+                             "dvs_camera")
+        self.frequency( 30 )
+
 class DepthCamera(VideoCamera):
     def __init__(self, name=None):
         VideoCamera.__init__(self, name, \

@@ -118,8 +118,10 @@ class UpperLegCycle( nef.Node ):
     self.period = period
     self.offset = offset
     self.section = self.period / 8.0
-    self.angles = [ math.radians( 10 ), math.radians( 20 ), math.radians( 30 ), math.radians( -60 ),
-                    math.radians( -70 ), math.radians( -60 ), math.radians( 45 ), math.radians( 0 ) ]
+    #self.angles = [ math.radians( 10 ), math.radians( 20 ), math.radians( 30 ), math.radians( -60 ),
+    #                math.radians( -70 ), math.radians( -60 ), math.radians( 45 ), math.radians( 0 ) ]
+    self.angles = [ math.radians( 20 ), math.radians( 20 ), math.radians( 20 ), math.radians( -30 ),
+                    math.radians( -45 ), math.radians( -45 ), math.radians( -30 ), math.radians( 0 ) ]
 
     self.wave = self.make_output( 'wave', dimensions=1 )
 
@@ -141,6 +143,8 @@ class LowerLegCycle( nef.Node ):
     self.period = period
     self.offset = offset
     self.section = self.period / 8.0
+    #self.angles = [ math.radians( 0 ), math.radians( 0 ), math.radians( 45 ), math.radians( 30 ),
+    #                math.radians( 90 ), math.radians( 0 ), math.radians( 45 ), math.radians( 30 ) ]
     self.angles = [ math.radians( 0 ), math.radians( 0 ), math.radians( 45 ), math.radians( 30 ),
                     math.radians( 90 ), math.radians( 0 ), math.radians( 45 ), math.radians( 30 ) ]
     
