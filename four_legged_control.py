@@ -14,7 +14,7 @@ PORT_CONT = 60001
 import nef
 
 PERIOD = 10
-STRENGTH = 20 # Constant factor applied to torque output
+STRENGTH = 25 # Constant factor applied to torque output
 
 components = [ 'body', 'back_left_upper_leg', 'back_right_upper_leg', 'front_left_upper_leg', 
                'front_right_upper_leg', 'head', 'back_left_lower_leg', 'back_right_lower_leg',
@@ -169,10 +169,10 @@ person = net.add( Person( 'person' ) )
 
 sine = net.add( SineWave( 'sine' ) )
 
-upper_cycle_1 = net.add( UpperLegCycle( 'upper_cycle_1', 5, 0 ) )
-upper_cycle_2 = net.add( UpperLegCycle( 'upper_cycle_2', 5, 2.5 ) )
-lower_cycle_1 = net.add( LowerLegCycle( 'lower_cycle_1', 5, 0 ) )
-lower_cycle_2 = net.add( LowerLegCycle( 'lower_cycle_2', 5, 2.5 ) )
+upper_cycle_1 = net.add( UpperLegCycle( 'upper_cycle_1', 8, 0 ) )
+upper_cycle_2 = net.add( UpperLegCycle( 'upper_cycle_2', 8, 4 ) )
+lower_cycle_1 = net.add( LowerLegCycle( 'lower_cycle_1', 8, 0 ) )
+lower_cycle_2 = net.add( LowerLegCycle( 'lower_cycle_2', 8, 4 ) )
 
 #for c in components:
 #  net.make_input( c, [0] )
