@@ -33,8 +33,10 @@ class DVSCameraPublisher(ROSPublisher):
         image.header.frame_id += '/base_image'
         image.height = self.component_instance.image_height
         image.width = self.component_instance.image_width
-        image.encoding = 'rgba8'
-        image.step = image.width * 4
+        #image.encoding = 'rgba8'
+        #image.step = image.width * 4
+        image.encoding = 'mono8'
+        image.step = image.width
 
         # VideoTexture.ImageRender implements the buffer interface
         #image.data = bytes(image_local)

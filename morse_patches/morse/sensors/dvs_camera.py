@@ -22,21 +22,29 @@ class DVSCamera( VideoCamera ):
     # Call the constructor of the parent class
     #super(self.__class__, self).__init__(obj, parent)
 
-    # 127 is grey
-    # -128 is grey
-    # 0 is black
-    # -1 is white
-    # alpha of -1 is solid
+    # 0   - Black
+    # 127 - Grey
+    # 255 - White
+
+    # TODO: clean this up, and split into different types of dvs cameras
 
     self.old_image_data = None
-    self.mask = numpy.ones(256*256*4, dtype='int8') #TODO: make this reusable
+    self.mask = numpy.ones(256*256*4, dtype='uint8') #TODO: make this reusable
     self.mask[3::4] = 0 # set the alpha channel to 0 on the mask
 
-    self.alpha_mask = numpy.zeros(256*256*4, dtype='int8') #TODO: make this reusable
+    self.alpha_mask = numpy.zeros(256*256*4, dtype='uint8') #TODO: make this reusable
     self.alpha_mask[3::4] = 1 # set the alpha channel to 1 on the mask
 
-    self.grey = numpy.ones(256*256*4, dtype='int8') * 127 #TODO: make this reusable
-    self.grey[3::4] = -1
+    self.grey = numpy.ones(256*256, dtype='uint8') * 127 #TODO: make this reusable
+    #self.grey = numpy.ones(256*256*4, dtype='uint8') * 127 #TODO: make this reusable
+    #self.grey[3::4] = 255
+    
+    self.step = numpy.ones(256*256, dtype='uint8') * 127 #TODO: make this reusable
+    #self.step = numpy.ones(256*256*4, dtype='uint8') * 127 #TODO: make this reusable
+    #self.step[3::4] = 0
+    
+    # For monochrome image
+    self.monochrome = numpy.ones( 256 * 256, dtype='uint8' ) * 1
 
     ## Component specific initialize (converters)
     #self.initialize()
@@ -73,28 +81,60 @@ class DVSCamera( VideoCamera ):
       """ #Simple Subtraction Method
       # Fill in the exportable data
       if self.old_image_data != None:
-        self.local_data['image'] = numpy.array(image_data.image, dtype='int8') - self.old_image_data * self.mask
+        self.local_data['image'] = numpy.array(image_data.image, dtype='uint8') - self.old_image_data * self.mask
         # remove small differences within a tolerance
         #self.local_data['image'][abs(self.local_data['image']) < 1] = 0
       else:
-        self.local_data['image'] = numpy.array(image_data.image, dtype='int8')
+        self.local_data['image'] = numpy.array(image_data.image, dtype='uint8')
       """
-      
-      # Only Reporting Black, White, and Grey
+      """
+      # Reporting the difference relative to Grey
       # Fill in the exportable data
-      new_image = numpy.array(image_data.image, dtype='int8')
+      new_image = numpy.array(image_data.image, dtype='uint8')
       if self.old_image_data != None:
         self.local_data['image'] = self.grey + (new_image - self.old_image_data) 
         # remove small differences within a tolerance
         #self.local_data['image'][abs(self.local_data['image']) < 1] = 0
       else:
         self.local_data['image'] = new_image
+      """
+      """
+      # Only Reporting Black, White, and Grey
+      # Fill in the exportable data
+      new_image = numpy.array(image_data.image, dtype='uint8')
+      if self.old_image_data != None:
+        black = new_image > self.old_image_data + 10
+        white = new_image < self.old_image_data - 10
+        self.local_data['image'] = self.grey - self.step * black + self.step * white
+        # remove small differences within a tolerance
+        #self.local_data['image'][abs(self.local_data['image']) < 1] = 0
+      else:
+        self.local_data['image'] = new_image
+      """
+      #"""
+      # Only Reporting Black, White, and Grey to greyscale image
+      # Fill in the exportable data
+      new_image = numpy.array(image_data.image, dtype='uint8')
+      if self.old_image_data != None:
+        
+        self.monochrome = ( new_image[0::4] * .299 + new_image[1::4] * 0.587 + new_image[2::4] * 0.144 ).astype('uint8')
 
-
+        #black = self.monochrome > self.old_image_data + 10
+        #white = self.monochrome < self.old_image_data - 10
+        black = self.monochrome > self.old_image_data + 15
+        white = self.monochrome + 15 < self.old_image_data
+        self.local_data['image'] = self.grey - self.step * black + self.step * white
+        #self.local_data['image'] = self.monochrome
+        # remove small differences within a tolerance
+        #self.local_data['image'][abs(self.local_data['image']) < 1] = 0
+      else:
+        self.local_data['image'] = self.monochrome#new_image
+      #"""
       self.capturing = True
 
       #self.old_image_data = numpy.array(image_data.image, dtype='int8')
-      self.old_image_data = new_image
+      #self.old_image_data = new_image
+      self.old_image_data = self.monochrome
 
       if (self._n > 0):
         self._n -= 1
