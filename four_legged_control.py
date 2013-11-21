@@ -2,8 +2,8 @@ import numeric as np
 import math
 import socket
 import sys
-sys.path.append('/home/komer/Downloads/jyson-1.0.2/src')
-sys.path.append('/home/komer/Downloads/jyson-1.0.2/lib/jyson-1.0.2.jar')
+sys.path.append('/home/bjkomer/Downloads/jyson-1.0.2/src')
+sys.path.append('/home/bjkomer/Downloads/jyson-1.0.2/lib/jyson-1.0.2.jar')
 import com.xhaus.jyson.JysonCodec as json # Jython version of json
 from com.xhaus.jyson import JSONDecodeError, JSONEncodeError
 
@@ -148,7 +148,7 @@ class LowerLegCycle( nef.Node ):
     self.angles = [ math.radians( 0 ), math.radians( 0 ), math.radians( 45 ), math.radians( 30 ),
                     math.radians( 90 ), math.radians( 0 ), math.radians( 45 ), math.radians( 30 ) ]
     
-    self.wave = self.make_output( 'wave', dimensions=1 )
+    self.wave = self.make_output( 'wave', dimensions=2 )
 
   def func( self, t ):
  
