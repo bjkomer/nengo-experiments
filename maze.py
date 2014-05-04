@@ -9,6 +9,7 @@ import math
 import time
 import numpy as np
 import nengo
+import nengo.utils.ros
 
 import json
 
@@ -171,10 +172,21 @@ model = nengo.Network( 'Maze Navigation', seed=13 )
 
 with model:
 
-  robot = Robot( 'Mouse' )
+  #robot = Robot( 'Mouse' )
+  robot = nengo.utils.ros.ForceTorque( name='Mouse', topic='navbot/control',
+                                       attributes=[ True, False, False, False,
+                                                    False, True ] )
 
-  target = Target( 'Target' )
+  #target = Target( 'Target' )
+  target = nengo.utils.ros.SemanticCamera( name='Target', topic='navbot/semantic',
+                                           targets=['target'] )
 
+  odometry = nengo.utils.ros.Odometry( name='odom', topic='navbot/odometry',
+                                      attributes = [ True, True, True,
+                                                     True, True, True,
+                                                     True, True, True,
+                                                     False, False, False ] )
+  
   external_input = ExternalInput( 'Control' )
 
   nengo.Connection( external_input, robot )
