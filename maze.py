@@ -3,13 +3,51 @@
 import rospy
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Wrench
+from std_msgs.msg import String
 
 import math
 import time
 import numpy as np
 import nengo
 
+import json
+
 CONTROL_PERIOD = 30
+
+class Target( nengo.objects.Node ):
+  """
+  This node is active if the target is seen by the semantic camera
+  """
+  
+  def __init__( self, name ):
+
+    #nengo.objects.Node.__init__( self, name, self.tick, dimensions=1 )
+
+    self.target = 'target'
+    self.seen = 0.0
+    
+    self.dest_sub = rospy.Subscriber( 'navbot/semantic', String,
+                                      self.callback )
+
+    #nengo.objects.Node.__init__( self, label=name, output=self.tick, size_in=1 )
+    super( Target, self ).__init__( label=name, output=self.tick,
+                                        size_in=0, size_out=1 )
+  
+  def callback( self, data ):
+    string = data.data
+    #TODO: put in error handling for malformed string
+    str_val = json.loads( string )
+    if len( str_val ) > 0:
+      for i in str_val:
+        if i['name'] == self.target:
+          self.seen = 1.0
+          break
+    else:
+      self.seen = 0.0
+  
+  def tick( self, t):
+    
+    return [ self.seen ]
 
 class ExternalInput( nengo.objects.Node ):
   """
@@ -23,41 +61,22 @@ class ExternalInput( nengo.objects.Node ):
 
     #nengo.objects.Node.__init__( self, name, self.tick, dimensions=1 )
 
-    self.dest_sub = None
-    self.deepcopied = False
-
     self.force = 0
     self.torque = 0
     
-
-    self.callback = self.dest_callback
+    self.dest_sub = rospy.Subscriber( 'navbot/input', Wrench,
+                                      self.callback )
 
     #nengo.objects.Node.__init__( self, label=name, output=self.tick, size_in=1 )
     super( ExternalInput, self ).__init__( label=name, output=self.tick,
                                         size_in=0, size_out=2 )
   
-  def dest_callback( self, data ):
+  def callback( self, data ):
     self.force = data.force.x
     self.torque = data.torque.z
- 
-  # Workaround to builder issue
-  def __getattribute__( self, name ):
-    if name == '__class__':
-      return nengo.objects.Node
-    else:
-      return super(ExternalInput, self).__getattribute__(name)
-    
+  
   def tick( self, t):
     
-    #gross hack to get around deepcopy issue
-    if self.dest_sub is None and self.deepcopied == True:
-      # This cannot be defined in init due to errors caused by deepcopy
-      self.dest_sub = rospy.Subscriber( 'navbot/input', Wrench,
-                                        self.callback )
-
-    if self.deepcopied == False:
-      self.deepcopied = True
-      
     return [ self.force,  self.torque ]
 
 class Robot( nengo.objects.Node ):
@@ -68,8 +87,6 @@ class Robot( nengo.objects.Node ):
                          'wx':0, 'wy':0, 'wz':0,
                          'roll':0, 'pitch':0, 'yaw':0 }
 
-    self.odom_sub = None
-    self.cont_pub = None
     self.control_signal = Wrench()
     
     # Linear
@@ -99,24 +116,17 @@ class Robot( nengo.objects.Node ):
     self.wz = 0
     
     self.counter = 0 # Used so that computations don't need to occur on every tick
+
+    self.odom_sub = rospy.Subscriber( 'navbot/odometry', Odometry,
+                                      self.callback )
     
-    self.deepcopied = False
-
-
-    self.callback = self.odom_callback
+    self.cont_pub = rospy.Publisher( 'navbot/control', Wrench )
 
     super( Robot, self).__init__( label=name, output=self.tick,
                                        size_in=2, size_out=12 )
-
-  # Workaround to issue with builder
-  def __getattribute__( self, name ):
-    if name == '__class__':
-      return nengo.objects.Node
-    else:
-      return super(Robot, self).__getattribute__(name)
-    
+  
   # Callback for morse, when odometry data is available
-  def odom_callback( self, data ):
+  def callback( self, data ):
     self.x = data.pose.pose.position.x
     self.y = data.pose.pose.position.y
     self.z = data.pose.pose.position.z
@@ -136,17 +146,6 @@ class Robot( nengo.objects.Node ):
   
   def tick( self, t, values ):
     
-    # gross hack to get around deepcopy issue
-    if self.odom_sub is None and self.deepcopied == True:
-      # This cannot be defined in init due to errors caused by deepcopy
-      self.odom_sub = rospy.Subscriber( 'navbot/odometry', Odometry,
-                                        self.callback )
-      
-      self.cont_pub = rospy.Publisher( 'navbot/control', Wrench )
-    
-    if self.deepcopied == False:
-      self.deepcopied = True
-
     self.counter += 1
     if self.counter % CONTROL_PERIOD == 0:
       force = values[0]
@@ -174,9 +173,13 @@ with model:
 
   robot = Robot( 'Mouse' )
 
+  target = Target( 'Target' )
+
   external_input = ExternalInput( 'Control' )
 
   nengo.Connection( external_input, robot )
+  
+  nengo.Connection( target, robot, transform=[[100],[0]] )
 
 sim = nengo.Simulator( model )
 
