@@ -9,7 +9,8 @@ import math
 import time
 import numpy as np
 import nengo
-import nengo.utils.ros
+from nengo.utils.ros import SemanticCameraNode, OdometryNode, \
+                            ForceTorqueNode, RotorcraftAttitudeNode
 
 import json
 
@@ -173,31 +174,53 @@ model = nengo.Network( 'Maze Navigation', seed=13 )
 with model:
 
   #robot = Robot( 'Mouse' )
-  robot = nengo.utils.ros.ForceTorque( name='Mouse', topic='navbot/control',
-                                       attributes=[ True, False, False, False,
-                                                    False, True ] )
+  robot = ForceTorqueNode( name='Mouse', topic='navbot/control',
+                           attributes=[ True, False, False, 
+                                        False, False, True ] )
 
   #target = Target( 'Target' )
-  target = nengo.utils.ros.SemanticCamera( name='Target', topic='navbot/semantic',
+  target = SemanticCameraNode( name='Target', topic='navbot/semantic',
                                            targets=['target'] )
 
-  odometry = nengo.utils.ros.Odometry( name='odom', topic='navbot/odometry',
-                                      attributes = [ True, True, True,
-                                                     True, True, True,
-                                                     True, True, True,
-                                                     False, False, False ] )
+  odometry = OdometryNode( name='odom', topic='navbot/odometry',
+                           attributes = [ False, False, False,
+                                          True, True, True,
+                                          False, False, False, False,
+                                          False, False, False ] )
+                          # attributes = [ True, True, True,
+                          #                True, True, True,
+                          #                True, True, True, True,
+                          #                False, False, False ] )
   
   external_input = ExternalInput( 'Control' )
+
+  #attitude = RotorcraftAttitudeNode( 'ra', topic='navbot/attitude' )
+
+  temp = nengo.Ensemble( 500, 3 )
 
   nengo.Connection( external_input, robot )
   
   nengo.Connection( target, robot, transform=[[100],[0]] )
+  
+  nengo.Connection( odometry, temp )
+  
+  #nengo.Connection( target, attitude, transform=[[0],[0],[0],[50]] )
+
+  probe_odom = nengo.Probe(temp, synapse=0.1)
 
 sim = nengo.Simulator( model )
 
 before = time.time()
-sim.run(1000)
+sim.run(100)
 
 after = time.time()
 print( "time to run:" )
 print( after - before )
+
+import matplotlib.pyplot as plt
+plt.subplot(2, 1, 1)
+plt.plot(sim.trange(), sim.data[probe_odom], lw=2)
+plt.title("Odometry")
+plt.tight_layout()
+
+plt.show()
