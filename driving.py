@@ -1,5 +1,4 @@
-# A model where the robot is attracted to specific colours while trying to avoid
-# other colours
+# A model where the robot moves to a specific point in local coordinates
 
 import rospy
 from nav_msgs.msg import Odometry
@@ -124,13 +123,11 @@ with model:
                            attributes=[ True, False, False, 
                                         False, False, True ] )
 
-  vision = ColourDetectionNode( name='Vision', topic='navbot/vision/image' )
-
   odometry = OdometryNode( name='odom', topic='navbot/odometry',
-                           attributes = [ False, False, False,
+                           attributes = [ True, True, True,
                                           True, True, True,
                                           False, False, False, False,
-                                          False, False, False ] )
+                                          True, True, True ] )
                           # attributes = [ True, True, True,
                           #                True, True, True,
                           #                True, True, True, True,
@@ -140,36 +137,88 @@ with model:
 
   # represents the way that the robot wants to move, one dimension is force, and
   # the other is torque
-  motion = nengo.Ensemble( 500, 2, radius=100 )
-  vis_temp = nengo.Ensemble( 500, 4 )
+  motion = nengo.Ensemble( 50, 2, radius=100 )
 
-  temp = nengo.Ensemble( 500, 3 )
-
-  nengo.Connection( external_input, robot )
   
-  F = 500.0
-  T = 50.0
-  nengo.Connection( vision, motion, transform=[ [0.1*F,0.5*F,0.5*F,0.1*F], 
-                                                [0.4*T,0.2*T,-0.2*T,-0.4*T] ] )
-  ##nengo.Connection( vision, motion, transform=[ [0,0,0,0], 
-  ##                                              [0,0,0,0] ] )
-  #nengo.Connection( vision, motion ) 
-  nengo.Connection( vision, vis_temp ) 
+  # Where the robot thinks it is in local x-y-direction coordinates
+  current_location = nengo.Ensemble( 50, 3, radius=10 )
+  
+  # Where the robot wants to go in local x-y-direction coordinates
+  #destination_location = nengo.Ensemble( 500, 3 )
+  
+  
+  # Where the robot thinks it is in local x-y coordinates
+  #current_location_simple = nengo.Ensemble( 500, 2 )
+  
+  # Where the robot wants to go in local x-y coordinates
+  destination_location_simple = nengo.Ensemble( 50, 2, radius=10 )
+
+  # Angle that the robot needs to move to face its destination
+  required_angle = nengo.Ensemble( 40, 1, radius=math.pi )
+
+  # The absolute distance the robot is from its destination
+  required_distance = nengo.Ensemble( 40, 1, radius=10 )
+
+  # Combines the ensembles for current_location and destination_location_simple
+  combined_location = nengo.Ensemble( 100, 5, radius=10 )
+
+  def req_dis( x ):
+    return math.sqrt( ( x[0] - x[3] ) ** 2 + ( x[1] - x[4] ) ** 2 )
+
+  def req_ang( x ):
+    return math.atan( ( x[1] - x[4] ) / ( x[0] - x[3] ) )
+
+  odom_ensemble = nengo.Ensemble( 100, 9, radius=10 )
+  nengo.Connection( odometry, odom_ensemble )
+
+  nengo.Connection( odom_ensemble, current_location, transform=[[1,0,0,0,0,0,0,0,0],
+                                                           [0,1,0,0,0,0,0,0,0],
+                                                           [0,0,0,0,0,0,0,0,1]] )
+
+  nengo.Connection( combined_location, required_distance, function=req_dis )
+  nengo.Connection( combined_location, required_angle, function=req_ang )
+  nengo.Connection( required_distance, motion, transform=[[20],[0]] )
+  nengo.Connection( required_angle, motion, transform=[[0],[10]] )
+
+
+  nengo.Connection( external_input, destination_location_simple )
+
+  nengo.Connection( current_location, combined_location, transform=[[1,0,0],
+                                                                    [0,1,0],
+                                                                    [0,0,1],
+                                                                    [0,0,0],
+                                                                    [0,0,0]] )
+  nengo.Connection( destination_location_simple, combined_location, 
+                    transform=[[0,0],
+                               [0,0],
+                               [0,0],
+                               [1,0],
+                               [0,1]] )
+
+  #nengo.Connection( external_input, robot )
+  
   
   nengo.Connection( motion, robot )
   
-  nengo.Connection( odometry, temp )
-  
 
-  probe_odom = nengo.Probe(temp, synapse=0.1)
-  probe_vis = nengo.Probe(motion, synapse=0.1)
-  #probe_vis = nengo.Probe(vis_temp, synapse=0.1)
+  probe_odom = nengo.Probe(odom_ensemble, synapse=0.1)
+  probe_cont = nengo.Probe(motion, synapse=0.1)
 
 sim = nengo.Simulator( model )
 
+"""
+import nengo_gui
+jv = nengo_gui.javaviz.View(model)
+sim = nengo.Simulator(model)
+jv.update_model(sim)
+jv.view()
+while True:
+      sim.run(1)
+"""
+#"""
 before = time.time()
-#sim.run(100)
-sim.run(150)
+#sim.run(150)
+sim.run(50)
 
 after = time.time()
 print( "time to run:" )
@@ -180,8 +229,9 @@ plt.subplot(2, 1, 1)
 plt.plot(sim.trange(), sim.data[probe_odom], lw=2)
 plt.title("Odometry")
 plt.subplot(2, 1, 2)
-plt.plot(sim.trange(), sim.data[probe_vis], lw=2)
+plt.plot(sim.trange(), sim.data[probe_cont], lw=2)
 plt.title("Vision")
 plt.tight_layout()
 
 plt.show()
+#"""

@@ -1,4 +1,4 @@
-# Morse scenario to set up maze
+# Morse scenario to set up space for driving
 from morse.builder import *
 
 mover = ATRV( 'target' )
@@ -19,6 +19,9 @@ robot.append( control )
 odom = Odometry()
 robot.append( odom )
 
+motionxyw = MotionXYW()
+robot.append( motionxyw )
+
 #collision = Collision()
 #robot.append( collision )
 
@@ -31,13 +34,14 @@ video.properties(Vertical_Flip=False)
 """
 
 video = VideoCamera()
-video.properties(cam_far=900, cam_height=16, cam_width=16, Vertical_Flip=True)
+video.properties(cam_far=900, cam_height=128, cam_width=128, Vertical_Flip=True)
 video.translate(x=0.4, z=1.0)
 video.frequency(frequency=10)
 robot.append(video)
 video.properties(Vertical_Flip=False)
 
 control.add_interface( 'ros', topic="/navbot/control" )
+motionxyw.add_interface( 'ros', topic="/navbot/velocity_control" )
 odom.add_interface( 'ros', topic="/navbot/odometry" )
 video.add_interface( 'ros', topic="/navbot/vision" )
 #collision.add_interface( 'ros', topic="/navbot/collision" )
