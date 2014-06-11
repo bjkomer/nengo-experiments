@@ -1,4 +1,4 @@
-# Control algorithm to drive a car to specific points, not using nengo
+# Control algorithm to drive a car to specific points with velocity, not using nengo
 import rospy
 import tf
 from nav_msgs.msg import Odometry
@@ -17,18 +17,18 @@ current_x = 0
 current_y = 0
 current_angle = 0
 
-max_force = 100
-max_torque = 50
+max_linear = 4.0
+max_angular = 1.0
 
 # minimum values so that the robot does not slow down too much before it reaches
 # its targer. Once within a tolerance these will switch off to be 0
-min_force = 35
-min_torque = 20
+min_linear = 0
+min_angular = 0
 
 distance_tolerance = 0.01
 angle_tolerance = 0.01
-torque_factor = 15
-force_factor = 20
+linear_factor = 2.0
+angular_factor = 1.5
 
 def input_callback( data ):
   global destination_x
@@ -80,12 +80,9 @@ input_sub = rospy.Subscriber( 'navbot/input', Wrench,
 odom_sub = rospy.Subscriber( 'navbot/odometry', Odometry,
                               odom_callback )
     
-control_pub = rospy.Publisher( 'navbot/control', Wrench )
-
 velocity_control_pub = rospy.Publisher( 'navbot/velocity_control', Twist )
 
-msg = Wrench()
-velocity_msg = Twist()
+msg = Twist()
 
 
 # calculates the difference between two angles
@@ -93,61 +90,41 @@ def angle_difference( a1, a2 ):
   dif  = a1 - a2
   if abs( dif ) > math.pi:
     dif = math.copysign( abs( dif ) - math.pi, dif )
-    """
-    if a1 < 0:
-      a1 += 2*math.pi
-    if a2 < 0:
-      a2 += 2*math.pi
-    dif = a1 - a2
-    """
   return dif
-  """
-  dif = ( a1 + 2 * math.pi ) - ( a2 + 2 * math.pi )
-  while dif > math.pi:
-    dif -= math.pi
-  return dif
-  """
+
 while True:
   time.sleep( 0.05 )
   distance = math.sqrt( ( current_x - destination_x ) ** 2 + \
                         ( current_y - destination_y ) ** 2 ) 
-  #angle = math.atan2( current_y - destination_y, current_x - destination_x )
   angle = math.atan2( destination_y - current_y, destination_x - current_x )
 
   #TODO: might need some cases for wrap-around
-  #angle_dif = angle_difference( current_angle, angle )
   angle_dif = angle_difference( angle, current_angle )
 
   if ( abs(angle_dif) > math.pi / 2 ) or distance < distance_tolerance:
-    force = 0
+    linear = 0
   else:
-    force = min( max_force, max( distance * \
-                                 force_factor * \
-                                 ((math.pi / 2) - abs(angle_dif)),
-                                 min_force ) )
+    linear = min( max_linear, max( distance * \
+                                   linear_factor * \
+                                   ((math.pi / 2) - abs(angle_dif)),
+                                   min_linear ) )
 
   if distance < distance_tolerance or abs( angle_dif ) < angle_tolerance:
-    torque = 0
+    angular = 0
   else:
-    if abs( angle_dif * torque_factor ) > max_torque:
-      torque = math.copysign( max_torque, angle_dif )
+    if abs( angle_dif * angular_factor ) > max_angular:
+      angular = math.copysign( max_angular, angle_dif )
     else:
-      torque = math.copysign( min( max_torque, 
-                                   max( abs( angle_dif * torque_factor ),
-                                        min_torque ) ), 
+      angular = math.copysign( min( max_angular, 
+                                    max( abs( angle_dif * angular_factor ),
+                                         min_angular ) ), 
                               angle_dif )
 
-  msg.force.x = force
-  msg.torque.z = torque
- 
-  velocity_msg.linear.x = force / 20
-  velocity_msg.angular.z = torque / 30
+  msg.linear.x = linear
+  msg.angular.z = angular
 
-  #control_pub.publish( msg ) #TEMP remove
-  
-  velocity_control_pub.publish( velocity_msg )
+  velocity_control_pub.publish( msg )
 
-  print( "Cur: X: %s, Y: %s, A: %s" % (current_x, current_y, current_angle) )
-  print( "Des: X: %s, Y: %s, A: %s" % (destination_x, destination_y, angle) )
-  print( "Force: %s, Torque: %s" % (force, torque) )
-  #print( distance, angle, current_angle )
+  print( "Cur: X: %.5f, Y: %.5f, A: %.5f" % (current_x, current_y, current_angle) )
+  print( "Des: X: %.5f, Y: %.5f, A: %.5f" % (destination_x, destination_y, angle) )
+  print( "Linear: %.5f, Angular: %.5f" % (linear, angular) )

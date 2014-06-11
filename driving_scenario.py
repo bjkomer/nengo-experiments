@@ -1,11 +1,11 @@
 # Morse scenario to set up space for driving
 from morse.builder import *
-
+"""
 mover = ATRV( 'target' )
 #mover.translate(x=3.0)
 mover.translate(x=2.0, z=3.0)
 mover.properties( Object=True, Graspable=False, Label="Target" )
-
+"""
 keyboard = Keyboard()
 keyboard.properties( Speed=4.0 )
 #mover.append( keyboard ) #TEMP
@@ -20,8 +20,8 @@ odom = Odometry()
 robot.append( odom )
 
 robot.append( keyboard ) #TEMP
-#motionxyw = MotionXYW()
-#robot.append( motionxyw )
+motionvw = MotionVW()
+robot.append( motionvw )
 
 #collision = Collision()
 #robot.append( collision )
@@ -42,7 +42,7 @@ robot.append(video)
 video.properties(Vertical_Flip=False)
 
 control.add_interface( 'ros', topic="/navbot/control" )
-#motionxyw.add_interface( 'ros', topic="/navbot/velocity_control" )
+motionvw.add_interface( 'ros', topic="/navbot/velocity_control" )
 odom.add_interface( 'ros', topic="/navbot/odometry" )
 video.add_interface( 'ros', topic="/navbot/vision" )
 #collision.add_interface( 'ros', topic="/navbot/collision" )
