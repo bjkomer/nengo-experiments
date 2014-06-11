@@ -8,7 +8,7 @@ mover.properties( Object=True, Graspable=False, Label="Target" )
 
 keyboard = Keyboard()
 keyboard.properties( Speed=4.0 )
-mover.append( keyboard )
+#mover.append( keyboard ) #TEMP
 
 robot = ATRV()
 robot.translate(z=3.0)
@@ -19,8 +19,9 @@ robot.append( control )
 odom = Odometry()
 robot.append( odom )
 
-motionxyw = MotionXYW()
-robot.append( motionxyw )
+robot.append( keyboard ) #TEMP
+#motionxyw = MotionXYW()
+#robot.append( motionxyw )
 
 #collision = Collision()
 #robot.append( collision )
@@ -41,7 +42,7 @@ robot.append(video)
 video.properties(Vertical_Flip=False)
 
 control.add_interface( 'ros', topic="/navbot/control" )
-motionxyw.add_interface( 'ros', topic="/navbot/velocity_control" )
+#motionxyw.add_interface( 'ros', topic="/navbot/velocity_control" )
 odom.add_interface( 'ros', topic="/navbot/odometry" )
 video.add_interface( 'ros', topic="/navbot/vision" )
 #collision.add_interface( 'ros', topic="/navbot/collision" )

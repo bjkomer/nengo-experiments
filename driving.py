@@ -10,7 +10,7 @@ import math
 import time
 import numpy as np
 import nengo
-from nengo.utils.ros import VideoCameraNode, OdometryNode, \
+from nengo.utils.ros import VideoCameraNode, OdometryNode, MotionXYWNode,\
                             ForceTorqueNode, RotorcraftAttitudeNode, RosSubNode
 
 CONTROL_PERIOD = 30
@@ -42,77 +42,6 @@ class ExternalInput( nengo.objects.Node ):
     
     return [ self.force,  self.torque ]
 
-class ColourDetectionNode( RosSubNode ):
-  """
-  This node outputs how black or white sections of an image are
-  """
-  
-  #TODO: add optional weights and transform function for output
-  def __init__( self, name, topic ):
-    """
-    Parameters
-    ----------
-    name : str
-        An arbitrary name for the object
-    topic : str
-        The name of the ROS topic that is being subscribed to
-    """
-
-    from cv_bridge import CvBridge, CvBridgeError
-    import numpy
-
-    self.bridge = CvBridge()
-
-    #self.dimensions = 16 * 16
-    self.dimensions = 4
-
-    def fn( data ):
-      rval = [0] * self.dimensions
-      #cv_im = self.bridge.imgmsg_to_cv( data, "rgba8" )
-      cv_im = self.bridge.imgmsg_to_cv( data, "mono8" )
-      #TODO: make sure mono conversion is correct
-      # 0 is black
-      im = numpy.array( cv_im )
-
-      # Generate a value between -1 and 1 corresponding to how black or white
-      # each section of the image is
-      #"""
-      l = numpy.average(im[:,0:5].ravel()) / 128 - 1
-      ml = numpy.average(im[:,3:8].ravel()) / 128 - 1
-      mr = numpy.average(im[:,7:12].ravel()) / 128 - 1
-      r = numpy.average(im[:,10:15].ravel()) / 128 - 1
-      #"""
-      """
-      l = numpy.average(im[0:5,:].ravel()) / 128 - 1
-      ml = numpy.average(im[3:8,:].ravel()) / 128 - 1
-      mr = numpy.average(im[7:12,:].ravel()) / 128 - 1
-      r = numpy.average(im[10:15,:].ravel()) / 128 - 1
-      """
-      """
-      l = numpy.average(im[0:3,:].ravel()) / 128 - 1
-      ml = numpy.average(im[4:7,:].ravel()) / 128 - 1
-      mr = numpy.average(im[8:11,:].ravel()) / 128 - 1
-      r = numpy.average(im[12:15,:].ravel()) / 128 - 1
-      """
-      """
-      l = numpy.average(im[0:3,:].ravel())
-      ml = numpy.average(im[4:7,:].ravel())
-      mr = numpy.average(im[8:11,:].ravel())
-      r = numpy.average(im[12:15,:].ravel())
-      """
-
-      #print( im )
-      #print( im[:,0] )
-      #print( [l, ml, mr, r] )
-      return [l, ml, mr, r]
-      #return [-l, -ml, -mr, -r]
-
-    self.fn = fn
-
-    super( ColourDetectionNode, self ).__init__( name=name, topic=topic,
-                                             dimensions=self.dimensions,
-                                             msg_type=Image, trans_fnc=self.fn )
-
 rospy.init_node( 'robot', anonymous=True )
 
 model = nengo.Network( 'Colour Preference', seed=13 )
@@ -122,7 +51,12 @@ with model:
   robot = ForceTorqueNode( name='Mouse', topic='navbot/control',
                            attributes=[ True, False, False, 
                                         False, False, True ] )
-
+  """
+  robot = MotionXYWNode( name='Mouse', topic='navbot/velocity_control',
+                           attributes=[ True, False, False, 
+                                        False, False, True ] )
+  """
+ 
   odometry = OdometryNode( name='odom', topic='navbot/odometry',
                            attributes = [ True, True, True,
                                           True, True, True,
@@ -138,7 +72,12 @@ with model:
   # represents the way that the robot wants to move, one dimension is force, and
   # the other is torque
   motion = nengo.Ensemble( 50, 2, radius=100 )
-
+  
+  """
+  # represents the way that the robot wants to move, one dimension is linear
+  # velocity, and the other is angular velocity
+  motion = nengo.Ensemble( 50, 2, radius=1 )
+  """
   
   # Where the robot thinks it is in local x-y-direction coordinates
   current_location = nengo.Ensemble( 50, 3, radius=10 )
@@ -166,7 +105,7 @@ with model:
     return math.sqrt( ( x[0] - x[3] ) ** 2 + ( x[1] - x[4] ) ** 2 )
 
   def req_ang( x ):
-    return math.atan( ( x[1] - x[4] ) / ( x[0] - x[3] ) )
+    return math.atan2( x[1] - x[4], x[0] - x[3] )
 
   odom_ensemble = nengo.Ensemble( 100, 9, radius=10 )
   nengo.Connection( odometry, odom_ensemble )
@@ -175,10 +114,12 @@ with model:
                                                            [0,1,0,0,0,0,0,0,0],
                                                            [0,0,0,0,0,0,0,0,1]] )
 
+  LINEAR = 10
+  ANGULAR = 5
   nengo.Connection( combined_location, required_distance, function=req_dis )
   nengo.Connection( combined_location, required_angle, function=req_ang )
-  nengo.Connection( required_distance, motion, transform=[[20],[0]] )
-  nengo.Connection( required_angle, motion, transform=[[0],[10]] )
+  nengo.Connection( required_distance, motion, transform=[[ LINEAR ],[0]] )
+  nengo.Connection( required_angle, motion, transform=[[0],[ ANGULAR ]] )
 
 
   nengo.Connection( external_input, destination_location_simple )
