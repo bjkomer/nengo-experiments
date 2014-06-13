@@ -22,13 +22,15 @@ max_angular = 1.0
 
 # minimum values so that the robot does not slow down too much before it reaches
 # its targer. Once within a tolerance these will switch off to be 0
-min_linear = 0
-min_angular = 0
+min_linear = 0.1 #0
+min_angular = 0.1 #0
 
-distance_tolerance = 0.01
-angle_tolerance = 0.01
-linear_factor = 2.0
-angular_factor = 1.5
+distance_tolerance = 0.05
+angle_tolerance = 0.05
+linear_factor = 0.5
+angular_factor = 0.5
+
+TURN_THEN_DRIVE = True
 
 def input_callback( data ):
   global destination_x
@@ -87,9 +89,25 @@ msg = Twist()
 
 # calculates the difference between two angles
 def angle_difference( a1, a2 ):
+
+  if abs(a1) + abs(a2) > math.pi:
+    if a1 < 0 and a2 > 0:
+      dif  = a1 - a2 + 2 * math.pi
+    elif a2 < 0 and a1 > 0:
+      dif  = a1 - a2 - 2 * math.pi
+    else:
+      dif = a1 - a2
+  else:
+    dif = a1 - a2
+
+  """
   dif  = a1 - a2
+  if a1 < -1 * math.pi / 2:
+    if a2 > math.pi / 2:
+      a1 += 2 * math.pi
   if abs( dif ) > math.pi:
     dif = math.copysign( abs( dif ) - math.pi, dif )
+  """
   return dif
 
 while True:
@@ -101,24 +119,46 @@ while True:
   #TODO: might need some cases for wrap-around
   angle_dif = angle_difference( angle, current_angle )
 
-  if ( abs(angle_dif) > math.pi / 2 ) or distance < distance_tolerance:
-    linear = 0
-  else:
-    linear = min( max_linear, max( distance * \
-                                   linear_factor * \
-                                   ((math.pi / 2) - abs(angle_dif)),
-                                   min_linear ) )
+  # Controller turns until it faces the right direction, and then drives
+  if TURN_THEN_DRIVE:
 
-  if distance < distance_tolerance or abs( angle_dif ) < angle_tolerance:
-    angular = 0
-  else:
-    if abs( angle_dif * angular_factor ) > max_angular:
-      angular = math.copysign( max_angular, angle_dif )
-    else:
+    if abs( angle_dif ) > angle_tolerance:
       angular = math.copysign( min( max_angular, 
                                     max( abs( angle_dif * angular_factor ),
                                          min_angular ) ), 
                               angle_dif )
+      linear = 0
+    elif distance > distance_tolerance:
+      angular = 0
+      linear = min( max_linear, max( distance * \
+                                     linear_factor * \
+                                     ((math.pi / 2) - abs(angle_dif)),
+                                     min_linear ) )
+    else:
+      linear = 0
+      angular = 0
+
+
+  else:
+
+    if ( abs(angle_dif) > math.pi / 2 ) or distance < distance_tolerance:
+      linear = 0
+    else:
+      linear = min( max_linear, max( distance * \
+                                     linear_factor * \
+                                     ((math.pi / 2) - abs(angle_dif)),
+                                     min_linear ) )
+
+    if distance < distance_tolerance or abs( angle_dif ) < angle_tolerance:
+      angular = 0
+    else:
+      if abs( angle_dif * angular_factor ) > max_angular:
+        angular = math.copysign( max_angular, angle_dif )
+      else:
+        angular = math.copysign( min( max_angular, 
+                                      max( abs( angle_dif * angular_factor ),
+                                           min_angular ) ), 
+                                angle_dif )
 
   msg.linear.x = linear
   msg.angular.z = angular
