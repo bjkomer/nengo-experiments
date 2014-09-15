@@ -1,6 +1,7 @@
 # Kalman filter implemented in neurons
 import nengo
 import numpy as np
+import rospy
 
 from nengo.utils.ros import PoseNode
 
@@ -133,6 +134,8 @@ def Q_to_X(x):
                     [x[1]]])
   val = Pmat * Hmat.T * (Hmat * Pmat * Hmat.T + Rmat).I * Ymat
   return [val[0,0], val[1,0], val[2,0], val[3,0]]
+
+rospy.init_node( 'kalman_filter', anonymous=True )
 
 # TODO: cut Y out of this model, it doesn't seem to be needed
 with model:
