@@ -98,7 +98,7 @@ class ControlGUI():
     
     # Read the output from the kalman filter
     # The four fields are x, y position and x, y velocity
-    self.filter_sub = rospy.Subscriber( 'navbot/filter', Quaternion, 
+    self.filter_sub = rospy.Subscriber( 'navbot/estimate', Quaternion, 
                                          self.filter_callback )
     
     self.filter_vars = []

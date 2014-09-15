@@ -11,33 +11,31 @@ from nengo.utils.ros import RotorcraftAttitudeNode as EstimateNode
 
 dt = 0.001
 N = 100
-radius = 1
+radius = 5
 # pstc = ???
 
 model = nengo.Network(label='Kalman Filter', seed=13)
 model.config[nengo.Ensemble].neuron_type=nengo.Direct()
+#model.config[nengo.Ensemble].neuron_type=nengo.LIF()
+model.config[nengo.Ensemble].radius=radius
 #model.config[nengo.Ensemble].synpase=pstc
 
-Xmat = np.matrix([[0],[0],[0],[0]])
-Umat = np.matrix([[0],[0],[0],[0]])
-Pmat = np.matrix([[0,0,0,0],
-                  [0,0,0,0],
-                  [0,0,1000.,0],
-                  [0,0,0,1000.]])
-Fmat = np.matrix([[1.,0,dt,0],
-                  [0,1.,0,dt],
-                  [0,0,1.,0],
-                  [0,0,0,1.]])
-Hmat = np.matrix([[1.,0,0,0],
-                  [0,1.,0,0]])
-Rmat = np.matrix([[.1,0],
-                  [0,.1]])
-Imat = np.matrix([[1.,0,0,0],
-                  [0,1.,0,0],
-                  [0,0,1.,0],
-                  [0,0,0,1.]])
-Ymat = np.matrix([[0],
-                  [0]])
+Xmat = np.matrix([[0.],[0.],[0.],[0.]])
+Umat = np.matrix([[0.],[0.],[0.],[0.]])
+Pmat = np.matrix([[0.,0.,0.,0.],
+                  [0.,0.,0.,0.],
+                  [0.,0.,1000.,0.],
+                  [0.,0.,0.,1000.]])
+Fmat = np.matrix([[1.,0.,dt,0.],
+                  [0.,1.,0,dt],
+                  [0.,0.,1.,0.],
+                  [0.,0.,0.,1.]])
+Hmat = np.matrix([[1.,0.,0.,0.],
+                  [0.,1.,0.,0.]])
+Rmat = np.matrix([[.1,0.],
+                  [0.,.1]])
+Ymat = np.matrix([[0.],
+                  [0.]])
 
 def trans(pre_dims, post_dims,
           weight=1.0, index_pre=None, index_post=None):
@@ -137,6 +135,7 @@ def Q_to_X(x):
 
 rospy.init_node( 'kalman_filter', anonymous=True )
 
+# TODO: initialize the uncertainty to something other than 0
 # TODO: cut Y out of this model, it doesn't seem to be needed
 with model:
   Z = PoseNode( 'Pose', mask=[1,1,0,0,0,0], topic='navbot/pose' )
@@ -160,8 +159,59 @@ with model:
   nengo.Connection(Q, P, function=Q_to_P)
 
   nengo.Connection(X, Estimate)
+ 
+  inputP = nengo.Node([10,10,1000,1000])
+  nengo.Connection(inputP, P)
+
+  probe_pose = nengo.Probe(Z, "output", synapse=0.01)
+  probe_estimate = nengo.Probe(X, "decoded_output", synapse=0.01)
+  probe_Y = nengo.Probe(Y, "decoded_output", synapse=0.01)
+  probe_Q = nengo.Probe(Q, "decoded_output", synapse=0.01)
+  probe_p_diag = nengo.Probe(P, "decoded_output", synapse=0.01)
   
 
+import time
+print( "starting simulator..." )
+before = time.time()
 
-sim = nengo.Simulator(model)
-sim.run(10)
+sim = nengo.Simulator( model, fixed_time=True )
+
+after = time.time()
+print( "time to build:" )
+print( after - before )
+
+print( "running simulator..." )
+before = time.time()
+
+sim.run(20)
+
+after = time.time()
+print( "time to run:" )
+print( after - before )
+
+import matplotlib.pyplot as plt
+
+plt.subplot(5, 1, 1)
+plt.plot(sim.trange(), sim.data[probe_pose], lw=2)
+plt.title("Pose")
+
+plt.subplot(5, 1, 2)
+plt.plot(sim.trange(), sim.data[probe_estimate], lw=2)
+plt.title("Estimate")
+
+plt.subplot(5, 1, 3)
+plt.plot(sim.trange(), sim.data[probe_Y], lw=2)
+plt.axvline(0.2, c='k')
+plt.title("Y")
+
+plt.subplot(5, 1, 4)
+plt.plot(sim.trange(), sim.data[probe_p_diag], lw=2)
+plt.title("P diagonal")
+
+plt.subplot(5, 1, 5)
+plt.plot(sim.trange(), sim.data[probe_Q], lw=2)
+plt.title("Q")
+
+plt.tight_layout()
+
+plt.show()
