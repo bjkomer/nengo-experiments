@@ -28,10 +28,10 @@ class CameraViewer():
   # Just view greyscale dvs images for now
   def im_callback( self, data ):
 
-    cv_im = self.bridge.imgmsg_to_cv( data, "mono8" ) # Convert Image from ROS Message to greyscale CV Image
+    cv_im = self.bridge.imgmsg_to_cv2( data, "mono8" ) # Convert Image from ROS Message to greyscale CV Image
     #cv_im = self.bridge.imgmsg_to_cv( data, "bgra8" )
     #cv_im = self.bridge.imgmsg_to_cv( data, "rgba8" )
-    im = np.asarray( cv_im ) # Convert from CV image to numpy array
+    im = np.asarray( cv_im )[:,:,0] # Convert from CV image to numpy array
     #im = np.asarray( cv_im, dtype='float32' ) / 256
     self.im_data.append( im )
 
