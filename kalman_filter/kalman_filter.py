@@ -1,16 +1,16 @@
 # Kalman filter implemented in neurons
 import nengo
 import numpy as np
-import rospy
+#import rospy
 
-from nengo.utils.ros import PoseNode
+#from nengo.utils.ros import PoseNode
 
 # 4D node that outputs a Quaternion, which will be used to represent the
 # x,y position and x,y velocity estimate
-from nengo.utils.ros import RotorcraftAttitudeNode as EstimateNode
+#from nengo.utils.ros import RotorcraftAttitudeNode as EstimateNode
 
 dt = 0.001
-N = 100
+N = 20
 radius = 5
 # pstc = ???
 
@@ -108,17 +108,37 @@ def P_to_Q(x):
   Pnew = Fmat * Pmat * Fmat.T
   return [Pnew[0,0], Pnew[1,1], Pnew[2,2], Pnew[3,3]]
 
+# uses full 4x4 P matrix
+def P_to_Q_full(x):
+
+  Pmat = np.matrix([[x[0],x[1],x[2],x[3]],
+                    [x[4],x[5],x[6],x[7]],
+                    [x[8],x[9],x[10],x[11]],
+                    [x[12],x[13],x[14],x[15]]])
+  Pnew = Fmat * Pmat * Fmat.T
+  return Pnew.ravel().tolist()[0]
+
 # Computes the delta P
 # -(P * H.T * (H * P * H.T + R).I) * H * P
 def Q_to_P(x):
 
-  #return (-K * H * P).tolist()
   Pmat = np.matrix([[x[2],0,0,0],
                     [0,x[3],0,0],
                     [0,0,x[4],0],
                     [0,0,0,x[5]]])
   Pnew = -(Pmat * Hmat.T * (Hmat * Pmat * Hmat.T + Rmat).I) * Hmat * Pmat
   return [Pnew[0,0], Pnew[1,1], Pnew[2,2], Pnew[3,3]]
+
+# uses full 4x4 P matrix
+def Q_to_P_full(x):
+
+  Pmat = np.matrix([[x[2],x[3],x[4],x[5]],
+                    [x[6],x[7],x[8],x[9]],
+                    [x[10],x[11],x[12],x[13]],
+                    [x[14],x[15],x[16],x[17]]])
+  Pnew = -(Pmat * Hmat.T * (Hmat * Pmat * Hmat.T + Rmat).I) * Hmat * Pmat
+  #Pnew = Pnew * .1 # FIXME: temp
+  return Pnew.ravel().tolist()[0]
 
 # Computes the delta X
 # P * H.T * (H * P * H.T + R).I * Y
@@ -133,8 +153,31 @@ def Q_to_X(x):
   val = Pmat * Hmat.T * (Hmat * Pmat * Hmat.T + Rmat).I * Ymat
   return [val[0,0], val[1,0], val[2,0], val[3,0]]
 
-rospy.init_node( 'kalman_filter', anonymous=True )
+# uses full 4x4 P matrix
+def Q_to_X_full(x):
 
+  Pmat = np.matrix([[x[2],x[3],x[4],x[5]],
+                    [x[6],x[7],x[8],x[9]],
+                    [x[10],x[11],x[12],x[13]],
+                    [x[14],x[15],x[16],x[17]]])
+  Ymat = np.matrix([[x[0]],
+                    [x[1]]])
+  val = Pmat * Hmat.T * (Hmat * Pmat * Hmat.T + Rmat).I * Ymat
+  #val = val * .1 # FIXME: temp
+  return [val[0,0], val[1,0], val[2,0], val[3,0]]
+
+def test_pose_fun( t ):
+  if t < 3:
+    return [t,-t]
+  elif t < 6:
+    return [(t-3)*1+3,-3]
+  elif t < 9:
+    return [6, (t-6)*1-3]
+  else:
+    return [6,0]
+
+#rospy.init_node( 'kalman_filter', anonymous=True )
+"""
 # TODO: initialize the uncertainty to something other than 0
 # TODO: cut Y out of this model, it doesn't seem to be needed
 with model:
@@ -160,7 +203,7 @@ with model:
 
   nengo.Connection(X, Estimate)
  
-  inputP = nengo.Node([10,10,1000,1000])
+  inputP = nengo.Node(lambda t: [0,0,1000,1000] if t <.2 else [0,0,0,0])
   nengo.Connection(inputP, P)
 
   probe_pose = nengo.Probe(Z, "output", synapse=0.01)
@@ -169,12 +212,63 @@ with model:
   probe_Q = nengo.Probe(Q, "decoded_output", synapse=0.01)
   probe_p_diag = nengo.Probe(P, "decoded_output", synapse=0.01)
   
+"""
+#"""
+#FIXME: TEMP: trying out full 4x4 P matrix
+with model:
+  #Z = PoseNode( 'Pose', mask=[1,1,0,0,0,0], topic='navbot/pose' )
+  Z = nengo.Node( test_pose_fun )
+  X = nengo.Ensemble(N*4, 4)
+  Y = nengo.Ensemble(N*2, 2)
+  Q = nengo.Ensemble(N*18, 18)
+  #Estimate = EstimateNode( 'Estimate', topic='navbot/estimate' )
 
+  P = nengo.Ensemble(N*16, 16)
+  
+  velocity_estimate = nengo.Ensemble(N, 2)
+  position_estimate = nengo.Ensemble(N, 2)
+
+  nengo.Connection(X, position_estimate, 
+                   transform=trans(4,2,index_pre=[0,1], index_post=[0,1]))
+  nengo.Connection(X, velocity_estimate, 
+                   transform=trans(4,2,index_pre=[2,3], index_post=[0,1]))
+
+  nengo.Connection(Z, Y)
+  nengo.Connection(X, Y, function=X_to_Y)
+  
+  nengo.Connection(Y, Q, 
+                   transform=trans(2, 18, index_pre=[0,1], index_post=[0,1]))
+  nengo.Connection(P, Q, function=P_to_Q_full, 
+                   transform=trans(16, 18, index_pre=range(16), index_post=range(2,18)))
+  
+  nengo.Connection(Q, X, function=Q_to_X_full)
+  nengo.Connection(Q, P, function=Q_to_P_full)
+  
+  # Integrators
+  nengo.Connection(P, P, synapse=.1)
+  nengo.Connection(X, X, synapse=.1)
+
+  #nengo.Connection(X, Estimate)
+ 
+  #inputP = nengo.Node([10,0,0,0,0,10,0,0,0,0,1000,0,0,0,0,1000])
+  inputP = nengo.Node(lambda t: [0.0,0,0,0,0,0.0,0,0,0,0,100,0,0,0,0,100] if
+                      t <.004 else [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
+  nengo.Connection(inputP, P)
+
+  probe_pose = nengo.Probe(Z, "output", synapse=0.01)
+  probe_estimate = nengo.Probe(X, "decoded_output", synapse=0.01)
+  probe_Y = nengo.Probe(Y, "decoded_output", synapse=0.01)
+  probe_Q = nengo.Probe(Q, "decoded_output", synapse=0.01)
+  probe_p_diag = nengo.Probe(P, "decoded_output", synapse=0.01)
+  probe_position = nengo.Probe(position_estimate, "decoded_output", synapse=0.01)
+  probe_velocity = nengo.Probe(velocity_estimate, "decoded_output", synapse=0.01)
+#"""
 import time
 print( "starting simulator..." )
 before = time.time()
 
-sim = nengo.Simulator( model, fixed_time=True )
+#sim = nengo.Simulator( model, fixed_time=True )
+sim = nengo.Simulator( model )
 
 after = time.time()
 print( "time to build:" )
@@ -183,7 +277,7 @@ print( after - before )
 print( "running simulator..." )
 before = time.time()
 
-sim.run(20)
+sim.run(10)
 
 after = time.time()
 print( "time to run:" )
@@ -195,22 +289,29 @@ plt.subplot(5, 1, 1)
 plt.plot(sim.trange(), sim.data[probe_pose], lw=2)
 plt.title("Pose")
 
+#plt.subplot(5, 1, 2)
+#plt.plot(sim.trange(), sim.data[probe_estimate], lw=2)
+#plt.title("Estimate")
+
 plt.subplot(5, 1, 2)
-plt.plot(sim.trange(), sim.data[probe_estimate], lw=2)
-plt.title("Estimate")
+plt.plot(sim.trange(), sim.data[probe_position], lw=2)
+plt.title("Position Estimate")
 
 plt.subplot(5, 1, 3)
-plt.plot(sim.trange(), sim.data[probe_Y], lw=2)
-plt.axvline(0.2, c='k')
-plt.title("Y")
+plt.plot(sim.trange(), sim.data[probe_velocity], lw=2)
+plt.title("Velocity Estimate")
 
 plt.subplot(5, 1, 4)
+plt.plot(sim.trange(), sim.data[probe_Y], lw=2)
+plt.title("Y")
+
+plt.subplot(5, 1, 5)
 plt.plot(sim.trange(), sim.data[probe_p_diag], lw=2)
 plt.title("P diagonal")
 
-plt.subplot(5, 1, 5)
-plt.plot(sim.trange(), sim.data[probe_Q], lw=2)
-plt.title("Q")
+#plt.subplot(5, 1, 5)
+#plt.plot(sim.trange(), sim.data[probe_Q], lw=2)
+#plt.title("Q")
 
 plt.tight_layout()
 
