@@ -10,22 +10,30 @@ import numpy as np
 #from nengo.utils.ros import RotorcraftAttitudeNode as EstimateNode
 
 dt = 0.001
-N = 20
-radius = 5
+N = 200
+radius = 10
 # pstc = ???
 
 model = nengo.Network(label='Kalman Filter', seed=13)
-model.config[nengo.Ensemble].neuron_type=nengo.Direct()
-#model.config[nengo.Ensemble].neuron_type=nengo.LIF()
+#model.config[nengo.Ensemble].neuron_type=nengo.Direct()
+model.config[nengo.Ensemble].neuron_type=nengo.LIF()
 model.config[nengo.Ensemble].radius=radius
 #model.config[nengo.Ensemble].synpase=pstc
 
 Xmat = np.matrix([[0.],[0.],[0.],[0.]])
 Umat = np.matrix([[0.],[0.],[0.],[0.]])
-Pmat = np.matrix([[0.,0.,0.,0.],
-                  [0.,0.,0.,0.],
+Pmat = np.matrix([[1000.,0.,0.,0.],
+                  [0.,1000.,0.,0.],
                   [0.,0.,1000.,0.],
                   [0.,0.,0.,1000.]])
+#Pmat = np.matrix([[0.,0.,0.,0.],
+#                  [0.,0.,0.,0.],
+#                  [0.,0.,1000.,0.],
+#                  [0.,0.,0.,1000.]])
+Pmat_const = np.matrix([[1.,0.,10./dt,0.],
+                  [0.,1.,0.,10./dt],
+                  [10./dt,0.,1.,0.],
+                  [0.,10./dt,0.,1.]])
 Fmat = np.matrix([[1.,0.,dt,0.],
                   [0.,1.,0.,dt],
                   [0.,0.,1.,0.],
@@ -186,7 +194,9 @@ ms = [[1.0, 0.0],
 def test_pose_fun( t ):
   #return [t,0]
   #return ms[int(t)]
-  return [t/2+1,t] 
+  #return [t/2+1,t] 
+  return [t/2,-t+5] 
+  #return [t,-t] 
   """
   if t < 3:
     return [t,-t]
@@ -288,7 +298,7 @@ with model:
   probe_position = nengo.Probe(position_estimate, "decoded_output", synapse=0.01)
   probe_velocity = nengo.Probe(velocity_estimate, "decoded_output", synapse=0.01)
 """
-#"""
+"""
 #FIXME: TEMP: trying out full 4x4 P matrix with more math and single population
 
 tau = 0.1#/dt
@@ -429,7 +439,7 @@ def update_P( x ):
   Kmat = Pmat * Hmat.T * (Hmat * Pmat * Hmat.T + Rmat).I
   Pnew = Fmat * (Imat - Kmat * Hmat) * Pmat * Fmat.T
   return Pnew.ravel().tolist()[0]
-
+"""
 # Combining prediction and measurement update together, and trying that out
 with model:
   #Z = PoseNode( 'Pose', mask=[1,1,0,0,0,0], topic='navbot/pose' )
@@ -455,17 +465,17 @@ with model:
   nengo.Connection(Z, Q[4:6] )
   
   # Read out the value of X
-  nengo.Connection(Q[0:4], X, synapse=0.1)
+  nengo.Connection(Q[0:4], X, synapse=.1)
 
-  nengo.Connection(Q, Q[0:4], function=update_X, synapse=0.1 )
-  nengo.Connection(Q, Q[6:22], function=update_P, synapse=0.1 )
+  nengo.Connection(Q, Q[0:4], function=update_X, synapse=0.001 )
+  nengo.Connection(Q, Q[6:22], function=update_P, synapse=0.001 )
 
   #nengo.Connection(X, Estimate)
  
   #inputP = nengo.Node([10,0,0,0,0,10,0,0,0,0,1000,0,0,0,0,1000])
   inputP = nengo.Node(lambda t:
                       [1000.0,0,0,0,0,1000.0,0,0,0,0,1000.0,0,0,0,0,1000.0] if
-                      t <.004 else [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
+                      t <.002 else [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
   nengo.Connection(inputP, Q[6:22])
 
   probe_pose = nengo.Probe(Z, "output", synapse=0.01)
@@ -475,7 +485,224 @@ with model:
   probe_p_diag = nengo.Probe(Q[6:22], "decoded_output", synapse=0.01)
   probe_position = nengo.Probe(position_estimate, "decoded_output", synapse=0.01)
   probe_velocity = nengo.Probe(velocity_estimate, "decoded_output", synapse=0.01)
-#"""
+"""
+def update_X_constP( x ):
+  Xmat = np.matrix([[x[0]],
+                    [x[1]],
+                    [x[2]],
+                    [x[3]]])
+  Zmat = np.matrix([[x[4]],
+                    [x[5]]])
+  Kmat = Pmat_const * Hmat.T * (Hmat * Pmat_const * Hmat.T + Rmat).I
+  Xnew = Fmat * (Xmat + Kmat * (Zmat - Hmat*Xmat))
+  return Xnew.ravel().tolist()[0]
+
+def Q_to_X_pp( x ):
+  # x = F * ( x + K * Y ) + u
+  # this function implements F*K*Y
+  Ymat = np.matrix([[x[0]],
+                    [x[1]]])
+  Pmat = np.matrix([[x[2],0,x[3],0],
+                    [0,x[4],0,x[5]],
+                    [x[6],0,x[7],0],
+                    [0,x[8],0,x[9]]])
+  Kmat = Pmat * Hmat.T * (Hmat * Pmat * Hmat.T + Rmat).I
+  Xupdate = Fmat * Kmat * Ymat
+  return Xupdate.ravel().tolist()[0]
+
+def update_X_pp( x ):
+  # x = F * ( x + K * Y ) + u
+  # this function implements F*x
+  Xmat = np.matrix([[x[0]],
+                    [x[1]],
+                    [x[2]],
+                    [x[3]]])
+  Xupdate = Fmat * Xmat
+  #Xupdate = Fmat * Xmat - Xmat #difference?
+  return Xupdate.ravel().tolist()[0]
+
+
+def update_P_pp( x ):
+  Pmat = np.matrix([[x[2],0,x[3],0],
+                    [0,x[4],0,x[5]],
+                    [x[6],0,x[7],0],
+                    [0,x[8],0,x[9]]])
+  Kmat = Pmat * Hmat.T * (Hmat * Pmat * Hmat.T + Rmat).I
+  Pnew = Fmat * (Imat - Kmat * Hmat) * Pmat * Fmat.T
+  return [Pnew[0,0], Pnew[0,2],
+          Pnew[1,1], Pnew[1,3],
+          Pnew[2,0], Pnew[2,2],
+          Pnew[3,1], Pnew[3,3]]
+
+
+# Combining Prediction and measurement together, separating out Y, and using
+# only half of the elements of the P matrix
+with model:
+  #Z = PoseNode( 'Pose', mask=[1,1,0,0,0,0], topic='navbot/pose' )
+  Z = nengo.Node( test_pose_fun )
+  X = nengo.Ensemble(N*4, 4)
+  #Y = nengo.Ensemble(N*2, 2)
+
+  # 0:2 -> Y
+  # 2:10 -> P
+  Q = nengo.Ensemble(N*10, 10)
+  #Estimate = EstimateNode( 'Estimate', topic='navbot/estimate' )
+
+  #P = nengo.Ensemble(N*16, 16)
+  
+  velocity_estimate = nengo.Ensemble(N, 2)
+  position_estimate = nengo.Ensemble(N, 2)
+
+  nengo.Connection(X[0:2], position_estimate[0:2] ) 
+  nengo.Connection(X[2:4], velocity_estimate[0:2] ) 
+
+  # Add the measurement as input
+  #nengo.Connection(Z, Y)
+  #nengo.Connection(X, Y, function=X_to_Y)
+  #nengo.Connection(Y, Q[0:2])
+  
+  # Have Y be fully a part of Q
+  nengo.Connection(Z, Q[0:2])
+  nengo.Connection(X, Q[0:2], function=X_to_Y)
+ 
+  nengo.Connection(X, X, function=update_X_pp)
+
+  # Read out the value of X
+  nengo.Connection(Q, X, function=Q_to_X_pp)
+
+  nengo.Connection(Q, Q[2:10], function=update_P_pp, synapse=0.1 )
+
+  #nengo.Connection(X, Estimate)
+ 
+  #inputP = nengo.Node([10,0,0,0,0,10,0,0,0,0,1000,0,0,0,0,1000])
+  inputP = nengo.Node(lambda t:
+                      [1000.0,0,1000.0,0,0,1000.0,0,1000.0] if
+                      t <.002 else [0,0,0,0,0,0,0,0])
+  nengo.Connection(inputP, Q[2:10])
+
+  probe_pose = nengo.Probe(Z, "output", synapse=0.01)
+  probe_estimate = nengo.Probe(X, "decoded_output", synapse=0.01)
+  #probe_Y = nengo.Probe(Y, "decoded_output", synapse=0.01)
+  probe_Q = nengo.Probe(Q, "decoded_output", synapse=0.01)
+  probe_p_diag = nengo.Probe(Q[6:22], "decoded_output", synapse=0.01)
+  probe_position = nengo.Probe(position_estimate, "decoded_output", synapse=0.01)
+  probe_velocity = nengo.Probe(velocity_estimate, "decoded_output", synapse=0.01)
+
+
+"""
+# Combining prediction and measurement update together, P constant
+with model:
+  #Z = PoseNode( 'Pose', mask=[1,1,0,0,0,0], topic='navbot/pose' )
+  Z = nengo.Node( test_pose_fun )
+  X = nengo.Ensemble(N*4, 4)
+  #Y = nengo.Ensemble(N*2, 2)
+
+  # 0:4 -> X
+  # 4:6 -> Z
+  Q = nengo.Ensemble(N*6, 6)
+  #Estimate = EstimateNode( 'Estimate', topic='navbot/estimate' )
+
+  #P = nengo.Ensemble(N*16, 16)
+  
+  velocity_estimate = nengo.Ensemble(N, 2)
+  position_estimate = nengo.Ensemble(N, 2)
+
+  nengo.Connection(X[0:2], position_estimate[0:2] ) 
+  nengo.Connection(X[2:4], velocity_estimate[0:2] ) 
+
+  # Add the measurement as input
+  nengo.Connection(Z, Q[4:6] )
+  
+  # Read out the value of X
+  nengo.Connection(Q[0:4], X, synapse=.1)
+
+  nengo.Connection(Q, Q[0:4], function=update_X_constP, synapse=0.001 )
+
+  #nengo.Connection(X, Estimate)
+ 
+  #inputP = nengo.Node([10,0,0,0,0,10,0,0,0,0,1000,0,0,0,0,1000])
+  inputP = nengo.Node(lambda t:
+                      [1.0,0,1.0,0,0,1.0,0,1.0,1.0,0,1.0,0,0,1.0,0,1.0] if
+                      t <.002 else [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
+
+  probe_pose = nengo.Probe(Z, "output", synapse=0.01)
+  probe_estimate = nengo.Probe(X, "decoded_output", synapse=0.01)
+  #probe_Y = nengo.Probe(Y, "decoded_output", synapse=0.01)
+  probe_Q = nengo.Probe(Q, "decoded_output", synapse=0.01)
+  probe_p_diag = nengo.Probe(inputP )
+  probe_position = nengo.Probe(position_estimate, "decoded_output", synapse=0.01)
+  probe_velocity = nengo.Probe(velocity_estimate, "decoded_output", synapse=0.01)
+"""
+def update_X_small( x ):
+  Xmat = np.matrix([[x[0]],
+                    [x[1]],
+                    [x[2]],
+                    [x[3]]])
+  Zmat = np.matrix([[x[4]],
+                    [x[5]]])
+  Pmat = np.matrix([[x[6],0,0,0],
+                    [0,x[7],0,0],
+                    [0,0,x[8],0],
+                    [0,0,0,x[9]]])
+  Kmat = Pmat * Hmat.T * (Hmat * Pmat * Hmat.T + Rmat).I
+  Xnew = Fmat * (Xmat + Kmat * (Zmat - Hmat*Xmat))
+  return Xnew.ravel().tolist()[0]
+
+def update_P_small( x ):
+  Pmat = np.matrix([[x[6],0,0,0],
+                    [0,x[7],0,0],
+                    [0,0,x[8],0],
+                    [0,0,0,x[9]]])
+  Kmat = Pmat * Hmat.T * (Hmat * Pmat * Hmat.T + Rmat).I
+  Pnew = Fmat * (Imat - Kmat * Hmat) * Pmat * Fmat.T
+  return [Pnew[0,0], Pnew[1,1], Pnew[2,2], Pnew[3,3]]
+"""
+# Combining prediction and measurement update together, using less dimensions
+with model:
+  #Z = PoseNode( 'Pose', mask=[1,1,0,0,0,0], topic='navbot/pose' )
+  Z = nengo.Node( test_pose_fun )
+  X = nengo.Ensemble(N*4, 4)
+  #Y = nengo.Ensemble(N*2, 2)
+
+  # 0:4 -> X
+  # 4:6 -> Z
+  # 6:10 -> P
+  Q = nengo.Ensemble(N*10, 10)
+  #Estimate = EstimateNode( 'Estimate', topic='navbot/estimate' )
+
+  #P = nengo.Ensemble(N*16, 16)
+  
+  velocity_estimate = nengo.Ensemble(N, 2)
+  position_estimate = nengo.Ensemble(N, 2)
+
+  nengo.Connection(X[0:2], position_estimate[0:2] ) 
+  nengo.Connection(X[2:4], velocity_estimate[0:2] ) 
+
+  # Add the measurement as input
+  nengo.Connection(Z, Q[4:6] )
+  
+  # Read out the value of X
+  nengo.Connection(Q[0:4], X, synapse=.1)
+
+  nengo.Connection(Q, Q[0:4], function=update_X_small, synapse=0.001 )
+  nengo.Connection(Q, Q[6:10], function=update_P_small, synapse=0.001 )
+
+  #nengo.Connection(X, Estimate)
+ 
+  #inputP = nengo.Node([10,0,0,0,0,10,0,0,0,0,1000,0,0,0,0,1000])
+  inputP = nengo.Node(lambda t:
+                      [1000.0,1000.0,1000.0,1000.0] if
+                      t <.002 else [0,0,0,0])
+  nengo.Connection(inputP, Q[6:10])
+
+  probe_pose = nengo.Probe(Z, "output", synapse=0.01)
+  probe_estimate = nengo.Probe(X, "decoded_output", synapse=0.01)
+  #probe_Y = nengo.Probe(Y, "decoded_output", synapse=0.01)
+  probe_Q = nengo.Probe(Q, "decoded_output", synapse=0.01)
+  probe_p_diag = nengo.Probe(Q[6:10], "decoded_output", synapse=0.01)
+  probe_position = nengo.Probe(position_estimate, "decoded_output", synapse=0.01)
+  probe_velocity = nengo.Probe(velocity_estimate, "decoded_output", synapse=0.01)
+"""
 
 
 import time
