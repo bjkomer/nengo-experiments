@@ -55,7 +55,7 @@ def save():
   name = entry.get()
   misc.imsave(name+'.png', get_template())
 
-def rectangle():
+def rectangle(i=0):
   global cur_index
   tlx = int(top_left_x.get())
   tly = int(top_left_y.get())
@@ -91,6 +91,7 @@ entry = Entry(master)
 entry.grid(row=0, column=2)
 
 # Controls for the bounding rectangle
+"""
 top_left_x = Entry(master)
 top_left_x.grid(row=1, column=0)
 top_left_x.insert(0, "0")
@@ -106,6 +107,18 @@ width.insert(0, "10")
 height = Entry(master)
 height.grid(row=1, column=3)
 height.insert(0, "10")
+"""
+top_left_x = Scale(master, from_=0, to=127, command=rectangle)
+top_left_x.grid(row=1, column=0)
+
+top_left_y = Scale(master, from_=0, to=127, command=rectangle)
+top_left_y.grid(row=1, column=1)
+
+width = Scale(master, from_=0, to=127, command=rectangle)
+width.grid(row=1, column=2)
+
+height = Scale(master, from_=0, to=127, command=rectangle)
+height.grid(row=1, column=3)
 
 show_rect = Button(master, text="Update Rectange", command=rectangle)
 show_rect.grid(row=1, column=4)
