@@ -37,7 +37,7 @@ class FlavourLand(object):
 
         # Draw circles for each flavour
         for i, loc in enumerate(self.flavours.itervalues()):
-            self.base_html += '<circle cx="{0}" cy="{1}" r="{2}" stroke-width="1.0" stroke="{3}" fill="{3}" />'.format(loc[0]*self.scale_x, loc[1]*self.scale_y, self.flavour_rad*self.scale_x, self.colour_list[i%self.num_colours])
+            self.base_html += '<circle cx="{0}" cy="{1}" r="{2}" stroke-width="1.0" stroke="{3}" fill="{3}" />'.format(loc[0]*self.scale_x, 100-loc[1]*self.scale_y, self.flavour_rad*self.scale_x, self.colour_list[i%self.num_colours])
 
         # Set up the agent to be filled in later with 'format()'
         self.base_html += '<polygon points="{0}" stroke="black" fill="black" />'
@@ -67,13 +67,13 @@ class FlavourLand(object):
 
         # Define points of the triangular agent based on x, y, and th
         x1 = (self.x + 0.5*np.cos(self.th - 2*np.pi/3))*self.scale_x
-        y1 = (self.y + 0.5*np.sin(self.th - 2*np.pi/3))*self.scale_y
+        y1 = 100-(self.y + 0.5*np.sin(self.th - 2*np.pi/3))*self.scale_y
         
         x2 = (self.x + np.cos(self.th))*self.scale_x
-        y2 = (self.y + np.sin(self.th))*self.scale_y
+        y2 = 100-(self.y + np.sin(self.th))*self.scale_y
         
         x3 = (self.x + 0.5*np.cos(self.th + 2*np.pi/3))*self.scale_x
-        y3 = (self.y + 0.5*np.sin(self.th + 2*np.pi/3))*self.scale_y
+        y3 = 100-(self.y + 0.5*np.sin(self.th + 2*np.pi/3))*self.scale_y
 
         points = "{0},{1} {2},{3} {4},{5}".format(x1,y1,x2,y2,x3,y3)
 
