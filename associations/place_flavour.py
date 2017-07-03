@@ -34,20 +34,19 @@ with model:
     fl = FlavourLand(shape=shape, flavours=flavours)
     env = nengo.Node(fl, size_in=2, size_out=3+len(flavours))
 
-    random_run = nengo.Node(RandomRun())
 
-    # linear and angular velocity
-    velocity = nengo.Node([0,0])
 
     # x, y, th
     location = nengo.Ensemble(n_neurons=300, dimensions=3)
 
     taste = nengo.Ensemble(n_neurons=10*len(flavours), dimensions=len(flavours))
 
+    # linear and angular velocity
     if random_inputs:
-        nengo.Connection(random_run, env)
+        velocity = nengo.Node(RandomRun())
     else:
-        nengo.Connection(velocity, env)
+        velocity = nengo.Node([0,0])
+    nengo.Connection(velocity, env)
 
     nengo.Connection(env[:3], location, function=scale_location)
 
