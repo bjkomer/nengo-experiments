@@ -1,4 +1,5 @@
 import nengo
+import numpy as np
 from world import FlavourLand
 
 model = nengo.Network(seed=13)
@@ -9,8 +10,18 @@ flavours = {"Banana":(1,2),
             "Apple":(2,5)
            }
 
+shape = (10,10)
+
+# Scales the location output to be between -1 and 1
+def scale_location(x):
+    x_out = x[0]/(shape[0]/2) - 1
+    y_out = x[1]/(shape[1]/2) - 1
+    th_out = x[2]/np.pi #TODO: should this get scaled at all?
+
+    return [x_out, y_out, th_out]
+
 with model:
-    fl = FlavourLand(shape=(10,10), flavours=flavours)
+    fl = FlavourLand(shape=shape, flavours=flavours)
     env = nengo.Node(fl, size_in=2, size_out=3+len(flavours))
 
     # linear and angular velocity
@@ -23,7 +34,7 @@ with model:
 
     nengo.Connection(velocity, env)
 
-    nengo.Connection(env[:3], location)
+    nengo.Connection(env[:3], location, function=scale_location)
 
     nengo.Connection(env[3:], taste)
 

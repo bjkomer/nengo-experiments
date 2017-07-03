@@ -66,14 +66,14 @@ class FlavourLand(object):
             self.y = 0
 
         # Define points of the triangular agent based on x, y, and th
-        x1 = self.x + np.cos(self.th - 2*np.pi/3)
-        y1 = self.y + np.sin(self.th - 2*np.pi/3)
+        x1 = (self.x + 0.5*np.cos(self.th - 2*np.pi/3))*self.scale_x
+        y1 = (self.y + 0.5*np.sin(self.th - 2*np.pi/3))*self.scale_y
         
-        x2 = self.x + 2*np.cos(self.th)
-        y2 = self.y + 2*np.sin(self.th)
+        x2 = (self.x + np.cos(self.th))*self.scale_x
+        y2 = (self.y + np.sin(self.th))*self.scale_y
         
-        x3 = self.x + np.cos(self.th + 2*np.pi/3)
-        y3 = self.y + np.sin(self.th + 2*np.pi/3)
+        x3 = (self.x + 0.5*np.cos(self.th + 2*np.pi/3))*self.scale_x
+        y3 = (self.y + 0.5*np.sin(self.th + 2*np.pi/3))*self.scale_y
 
         points = "{0},{1} {2},{3} {4},{5}".format(x1,y1,x2,y2,x3,y3)
 
