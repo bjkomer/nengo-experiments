@@ -65,6 +65,36 @@ class FlavourLand(object):
         if self.y < 0:
             self.y = 0
 
+        self.update_html()
+    
+    def move_random(self, vel=5):
+
+        # randomly vary direction angle between -90 and +90 degrees
+        #ang_diff = np.random.random() * np.pi - np.pi/2
+        
+        # randomly vary direction angle between -5 and +5 degrees
+        ang_diff = (np.random.random() * np.pi - np.pi/2)/18
+
+        self.th += ang_diff
+
+        dx = vel * np.cos(self.th)
+        dy = vel * np.sin(self.th)
+
+        self.x += dx * self.dt
+        self.y += dy * self.dt
+
+        if self.x > self.shape[0]:
+            self.x = self.shape[0]
+        if self.x < 0:
+            self.x = 0
+        if self.y > self.shape[1]:
+            self.y = self.shape[1]
+        if self.y < 0:
+            self.y = 0
+
+        self.update_html()
+        
+    def update_html(self):
         # Define points of the triangular agent based on x, y, and th
         x1 = (self.x + 0.5*np.cos(self.th - 2*np.pi/3))*self.scale_x
         y1 = 100-(self.y + 0.5*np.sin(self.th - 2*np.pi/3))*self.scale_y
@@ -79,7 +109,6 @@ class FlavourLand(object):
 
         # Update the html plot
         self._nengo_html_ = self.base_html.format(points)
-        
 
     def get_flavours(self):
 
@@ -96,9 +125,26 @@ class FlavourLand(object):
         else:
             return 0
 
+    def generate_data(self, steps=1000, vel=5):
+        """
+        Generate artificial data corresponding to randomly moving through the environment
+        """
+
+        data = np.zeros((steps, 3 + self.num_flavours))
+
+        for i in range(steps):
+
+            self.move_random(vel)
+
+            f = self.get_flavours()
+            data[i,:] = [self.x, self.y, self.th] + f
+
+        return data
+
     def __call__(self, t, x):
 
-        self.move(x)
+        #self.move(x)
+        self.move_random()
 
         f = self.get_flavours() #TODO: figure out the format of the flavours
 
