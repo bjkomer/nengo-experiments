@@ -2,6 +2,12 @@ import nengo
 import numpy as np
 from world import FlavourLand
 
+#TODO: only import the functions that are used
+from utils import to_xy, to_xyz, cyclic_to_xy, ang_to_cyclic, ang_to_xy, integrate_velocity
+
+#NOTE: this is currently linked to this directory
+from html_plots import CompleteSpatialSpikePlot
+
 model = nengo.Network(seed=13)
 
 flavours = {"Banana":(1,2),
