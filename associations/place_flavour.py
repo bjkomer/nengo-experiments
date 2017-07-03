@@ -3,17 +3,21 @@ import numpy as np
 from world import FlavourLand
 
 #TODO: only import the functions that are used
-from utils import to_xy, to_xyz, cyclic_to_xy, ang_to_cyclic, ang_to_xy, integrate_velocity
+from utils import to_xy, to_xyz, cyclic_to_xy, ang_to_cyclic, ang_to_xy,\
+                  integrate_velocity, RandomRun
 
-#NOTE: this is currently linked to this directory
 from html_plots import CompleteSpatialSpikePlot
+
+#TODO: load in a random walk function, as well as a way to generate and save data
+# NOTE: just send it sensible actual position/angle pairs instead of velocity
+random_inputs = False
 
 model = nengo.Network(seed=13)
 
 flavours = {"Banana":(1,2),
-            "Peach":(3,3),
-            "Lemon":(4,1),
-            "Apple":(2,5)
+            "Peach":(4,4),
+            "Lemon":(6,1),
+            "Apple":(2,7)
            }
 
 shape = (10,10)
@@ -30,6 +34,8 @@ with model:
     fl = FlavourLand(shape=shape, flavours=flavours)
     env = nengo.Node(fl, size_in=2, size_out=3+len(flavours))
 
+    random_run = nengo.Node(RandomRun())
+
     # linear and angular velocity
     velocity = nengo.Node([0,0])
 
@@ -38,7 +44,10 @@ with model:
 
     taste = nengo.Ensemble(n_neurons=10*len(flavours), dimensions=len(flavours))
 
-    nengo.Connection(velocity, env)
+    if random_inputs:
+        nengo.Connection(random_run, env)
+    else:
+        nengo.Connection(velocity, env)
 
     nengo.Connection(env[:3], location, function=scale_location)
 
