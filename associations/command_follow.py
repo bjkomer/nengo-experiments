@@ -68,21 +68,36 @@ def control(t, x):
 # compute a control signal to get to the location
 def compute_velocity(x):
     # which way the agent should face to go directly to the target
-    desired_ang = np.arctan2(x[1], x[0])
-    ang_diff = x[2] - desired_ang
+    desired_ang = np.arctan2(-x[1], -x[0])
+    
+    ang_diff = -1*(x[2] - desired_ang)
     #ang_diff = desired_ang - x[2]
+    print(x[0], x[1])
+    print(x[2], desired_ang)
+    print(ang_diff)
+    #"""
     if ang_diff > np.pi:
         ang_diff -= 2*np.pi
     elif ang_diff < -np.pi:
         ang_diff += 2*np.pi
+    #"""
+    print(ang_diff)
 
     ang_vel = ang_diff*.9
+    if np.sqrt(x[0]**2+x[1]**2) < .001:
+        lin_vel = 0
+        ang_vel = 0
     if abs(ang_diff) < np.pi/2.:
         lin_vel = .8*np.sqrt(x[0]**2+x[1]**2)
-        lin_vel = 0
+        if lin_vel < .001:
+            ang_vel *= lin_vel
+        #ang_vel *= lin_vel # this will stop oscillations once it reaches the destination
+        #lin_vel = 0
     else:
         lin_vel = 0
-        lin_vel = .8*np.sqrt(x[0]**2+x[1]**2)
+        #lin_vel = 1.8*np.sqrt(x[0]**2+x[1]**2)
+        #lin_vel = 0.001*np.sqrt(x[0]**2+x[1]**2)
+        #ang_vel *= lin_vel # this will stop oscillations once it reaches the destination
     
     return lin_vel, ang_vel
 
@@ -97,11 +112,11 @@ with model:
 
     command = nengo.Node([0,0])
 
-    vel_input = nengo.Ensemble(n_neurons=200, dimensions=2)
+    vel_input = nengo.Ensemble(n_neurons=200, dimensions=2, radius=3)
 
     nengo.Connection(vel_input, env)
 
-    pos_error = nengo.Ensemble(n_neurons=300, dimensions=3)
+    pos_error = nengo.Ensemble(n_neurons=300, dimensions=3, radius=10)
 
     nengo.Connection(env[:3], pos_error, transform=1)
     nengo.Connection(command, pos_error[:2], transform=-1)
