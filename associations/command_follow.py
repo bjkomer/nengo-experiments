@@ -71,38 +71,24 @@ def compute_velocity(x):
     desired_ang = np.arctan2(-x[1], -x[0])
     
     ang_diff = -1*(x[2] - desired_ang)
-    #ang_diff = desired_ang - x[2]
-    print(x[0], x[1])
-    print(x[2], desired_ang)
-    print(ang_diff)
-    #"""
+    
     if ang_diff > np.pi:
         ang_diff -= 2*np.pi
     elif ang_diff < -np.pi:
         ang_diff += 2*np.pi
-    #"""
-    print(ang_diff)
 
     ang_vel = ang_diff*.9
     if np.sqrt(x[0]**2+x[1]**2) < .001:
         lin_vel = 0
         ang_vel = 0
-    if abs(ang_diff) < np.pi/2.:
-        lin_vel = .8*np.sqrt(x[0]**2+x[1]**2)
-        if lin_vel < .001:
-            ang_vel *= lin_vel
-        #ang_vel *= lin_vel # this will stop oscillations once it reaches the destination
-        #lin_vel = 0
+    elif abs(ang_diff) < np.pi/4.:
+        lin_vel = .6*np.sqrt(x[0]**2+x[1]**2)
+    elif abs(ang_diff) < np.pi/2.:
+        lin_vel = .4*np.sqrt(x[0]**2+x[1]**2)
     else:
         lin_vel = 0
-        #lin_vel = 1.8*np.sqrt(x[0]**2+x[1]**2)
-        #lin_vel = 0.001*np.sqrt(x[0]**2+x[1]**2)
-        #ang_vel *= lin_vel # this will stop oscillations once it reaches the destination
     
     return lin_vel, ang_vel
-
-#intercept = (np.dot(keys, keys.T) - np.eye(num_items)).flatten().max()
-intercept = .001 # arbitrary for now
 
 model.config[nengo.Ensemble].neuron_type=nengo.Direct()
 

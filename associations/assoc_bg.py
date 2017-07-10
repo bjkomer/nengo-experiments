@@ -40,22 +40,25 @@ action_vocab.add('FIND', [0,0,1])
 # compute a control signal to get to the location
 def compute_velocity(x):
     # which way the agent should face to go directly to the target
-    desired_ang = np.arctan2(x[1], x[0])
-    ang_diff = x[2] - desired_ang
-    #ang_diff = desired_ang - x[2]
+    desired_ang = np.arctan2(-x[1], -x[0])
+    
+    ang_diff = -1*(x[2] - desired_ang)
+    
     if ang_diff > np.pi:
         ang_diff -= 2*np.pi
     elif ang_diff < -np.pi:
         ang_diff += 2*np.pi
 
     ang_vel = ang_diff*.9
-    if abs(ang_diff) < np.pi/2.:
-        #lin_vel = .8*np.sqrt(x[0]**2+x[1]**2)
+    if np.sqrt(x[0]**2+x[1]**2) < .001:
         lin_vel = 0
+        ang_vel = 0
+    elif abs(ang_diff) < np.pi/4.:
+        lin_vel = .6*np.sqrt(x[0]**2+x[1]**2)
+    elif abs(ang_diff) < np.pi/2.:
+        lin_vel = .4*np.sqrt(x[0]**2+x[1]**2)
     else:
-        #lin_vel = 0
-        lin_vel = 3.0*np.sqrt(x[0]**2+x[1]**2)
-        ang_vel *= lin_vel # this will stop oscillations once it reaches the destination
+        lin_vel = 0
     
     return lin_vel, ang_vel
 
@@ -216,13 +219,13 @@ with model:
 
 
     ##nengo.Connection(task, control_node_loc[0])
-    nengo.Connection(task, control_node_flav[0])
+    nengo.Connection(task, control_node_flav[0], synapse=None)
     
     ##nengo.Connection(scaled_loc[:2], control_node_loc[[1,2]])
     ##nengo.Connection(query_loc_scaled, control_node_loc[[3,4]])
     
-    nengo.Connection(env[3:], control_node_flav[[1,2,3,4]])
-    nengo.Connection(model.query_flavour.output, control_node_flav[[5,6,7,8]])
+    nengo.Connection(env[3:], control_node_flav[[1,2,3,4]], synapse=None)
+    nengo.Connection(model.query_flavour.output, control_node_flav[[5,6,7,8]], synapse=None)
 
     #conn_in_loc = nengo.Connection(control_node_loc, memory_loc, function=loc_to_surface, 
     conn_in_loc = nengo.Connection(working_loc, memory_loc, function=loc_to_surface, 
@@ -240,15 +243,16 @@ with model:
     #learning = nengo.Ensemble(n_neurons=100, dimensions=1)
     learning = nengo.Ensemble(n_neurons=100, dimensions=1, neuron_type=nengo.Direct())
     inhibition = nengo.Node([-1])
-    nengo.Connection(inhibition, learning)
+    nengo.Connection(inhibition, learning, synapse=None)
     
     nengo.Connection(learning, conn_in_loc.learning_rule, synapse=None, transform=1)
     nengo.Connection(learning, conn_in_flav.learning_rule, synapse=None, transform=1)
 
     nengo.Connection(env[3:], learning, transform=1*np.ones((1,len(flavours))))
 
-    recall_flav = nengo.Ensemble(n_neurons=200, dimensions=len(flavours))
-    recall_loc = nengo.Ensemble(n_neurons=400, dimensions=4)
+    recall_flav = nengo.Ensemble(n_neurons=200, dimensions=len(flavours), neuron_type=nengo.Direct())
+    #recall_loc = nengo.Ensemble(n_neurons=400, dimensions=4, neuron_type=nengo.Direct())
+    recall_loc = nengo.Ensemble(n_neurons=400, dimensions=4, neuron_type=nengo.LIF())
 
     conn_out_flav = nengo.Connection(memory_loc, recall_flav,
                                 learning_rule_type=nengo.PES(1e-3),
@@ -283,7 +287,7 @@ with model:
     scaled_recall_loc = nengo.Node(env_scale_node, size_in=2, size_out=2)
     nengo.Connection(recall_loc, scaled_recall_loc, function=surface_to_env)
 
-
+    #with nengo.Network() as control_system:
     vel_input = nengo.Ensemble(n_neurons=200, dimensions=2, neuron_type=nengo.Direct())
 
     nengo.Connection(vel_input, env)
@@ -330,3 +334,9 @@ with model:
     nengo.Connection(scaled_recall_loc, bg_node[[5,6]], synapse=None)
     nengo.Connection(env[:2], bg_node[[7,8]], synapse=None)
     nengo.Connection(query_loc_scaled, bg_node[[9,10]], synapse=None)
+
+# Do some data recording and save encoders/decoders here
+if __name__ == '__main__':
+    with model:
+        pass
+    print("test")
