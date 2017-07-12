@@ -2,6 +2,7 @@ import sys
 import numpy as np
 from PIL import Image
 import base64
+import nengo
 
 # TODO: add options to be compatible with Python3?
 import cStringIO
@@ -72,8 +73,10 @@ class CompleteSpatialSpikePlot(object):
         index = min(self.n_neurons-1, index)
 
         # Get coordinates in the image
-        x_im = int((x_loc + self.x_len/2.)*1.*self.grid_size/self.x_len)
-        y_im = int((y_loc + self.y_len/2.)*1.*self.grid_size/self.y_len)
+        #x_im = int((x_loc + self.x_len/2.)*1.*self.grid_size/self.x_len)
+        #y_im = int((y_loc + self.y_len/2.)*1.*self.grid_size/self.y_len)
+        x_im = int((x_loc + self.x_len - self.xlim[1])*1.*self.grid_size/self.x_len)
+        y_im = int((y_loc + self.y_len - self.ylim[1])*1.*self.grid_size/self.y_len)
         
         if x_im >= 0 and x_im < self.grid_size and y_im >= 0 and y_im < self.grid_size:
 
@@ -155,3 +158,60 @@ class TuningHeatMap(object):
                    xlink:href="data:image/png;base64,%s"
                    style="image-rendering: pixelated;">
             </svg>''' % (''.join(img_str))
+
+class EncoderPlot(nengo.Node):
+
+    def __init__(self, connection, ):
+
+        self.connection = connection
+
+        self.ensemble = connection.post_obj
+
+        self.encoder_probe = nengo.Probe(connection.learning_rule, 'scaled_encoders')
+
+        self.encoders = None
+
+        #self.update_html()
+
+        def plot(t):
+            if self.encoders is None:
+                return
+            plot._nengo_html_ = '<svg width="100%" height="100%" viewbox="0 0 100 100">'
+            #mx = (np.max(self.encoders) + np.mean(self.encoders))/2.
+            mx = np.max(self.encoders)
+            if mx > 0:
+                self.encoders = self.encoders * (50. /mx)
+            for e in self.encoders:
+                plot._nengo_html_ += '<circle cx="{0}" cy="{1}" r="{2}"  stroke-width="1.0" stroke="blue" fill="blue" />'.format(e[0]+50, e[1]+50, 1)
+            plot._nengo_html_ += '</svg>'
+
+        super(EncoderPlot, self).__init__(plot, size_in=0, size_out=0)
+        self.output._nengo_html_ = '<svg width="100%" height="100%" viewbox="0 0 100 100"></svg>'
+
+    def update_html(self):
+
+        self._nengo_html_ = '<svg width="100%" height="100%" viewbox="0 0 100 100">'
+        #TODO: make sure this works
+        print(dir(self.ensemble.encoders))
+        print(dir(self.ensemble))
+        try:
+            for e in self.ensemble.encoders:
+                print(type(e))
+                self._nengo_html_ += '<circle cx="{0}" cy="{1}" r="{2}"  stroke-width="1.0" stroke="blue" fill="blue" />'.format(e[0], e[1], 1)
+        except:
+            pass
+
+        self._nengo_html_ += '</svg>'
+
+    def update(self, sim):
+        if sim is None:
+            return
+
+        self.encoders = sim._probe_outputs[self.encoder_probe][-1]
+        del sim._probe_outputs[self.encoder_probe][:]
+
+    """
+    def __call__(self, t):
+
+        self.update_html()
+    """
