@@ -29,7 +29,9 @@ shape = (10,10)
 
 D = 2#16
 
-mem_dim = 2 #4
+mem_dim = 4#2 #4
+
+normalize = True
 
 action_vocab = spa.Vocabulary(3, randomize=False)
 
@@ -150,7 +152,14 @@ class CycleInputs(object):
         #return [self.x, self.y, self.th] + self.f
         return [self.x, self.y] + self.room_vec
 
-intercept = .65
+def normalize(x):
+
+    if np.linalg.norm(x) > 0:
+        return x / np.linalg.norm(x)
+    else:
+        return x
+
+intercept = .70
 with model:
     #fl = FlavourLand(shape=shape, flavours=flavours, 
     #                 flavour_rad=.1, motion_type='teleport')
@@ -191,12 +200,12 @@ with model:
     nengo.Connection(vec_to_scalar, env[-1], synapse=None)
 
     if mem_dim == 2:
-        multimodal = nengo.Ensemble(n_neurons=500, dimensions=2+len(flavours_A))
+        multimodal = nengo.Ensemble(n_neurons=500, dimensions=2+len(flavours_A), neuron_tpye=nengo.Direct())
         memory = nengo.Ensemble(n_neurons=500, dimensions=2+len(flavours_A), intercepts=[intercept]*500)
         nengo.Connection(env[[0,1]], multimodal[[0,1]], function=scale_location_xy)
         nengo.Connection(env[3:], multimodal[2:])
     elif mem_dim == 4:
-        multimodal = nengo.Ensemble(n_neurons=500, dimensions=4+len(flavours_A))
+        multimodal = nengo.Ensemble(n_neurons=500, dimensions=4+len(flavours_A), neuron_type=nengo.Direct())
         memory = nengo.Ensemble(n_neurons=500, dimensions=4+len(flavours_A), intercepts=[intercept]*500)
         #memory = nengo.Ensemble(n_neurons=500, dimensions=4+len(flavours_A), intercepts=[intercept]*250+[-intercept]*250)
         #memory = nengo.Ensemble(n_neurons=500, dimensions=4+len(flavours_A))
@@ -208,7 +217,10 @@ with model:
 
     voja = nengo.Voja(post_tau=None, learning_rate=5e-2)
 
-    conn_in = nengo.Connection(multimodal, memory, learning_rule_type=voja)
+    if normalize:
+        conn_in = nengo.Connection(multimodal, memory, learning_rule_type=voja, function=normalize)
+    else:
+        conn_in = nengo.Connection(multimodal, memory, learning_rule_type=voja)
 
     conn_out = nengo.Connection(memory, model.room_recall.input, learning_rule_type=nengo.PES(1e-3),
                      function=lambda x: np.zeros(D))
@@ -236,7 +248,8 @@ with model:
     nengo.Connection(task, error.neurons, transform=[[-10]] * 500, synapse=None)
 
     
-    plot = EncoderPlot(conn_in)
+    #plot = EncoderPlot(conn_in, scaling='normalize')
+    plot = EncoderPlot(conn_in, scaling='max')
 
 def on_step(sim):
     plot.update(sim)
