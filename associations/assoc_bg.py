@@ -6,8 +6,12 @@ import numpy as np
 from world import FlavourLand
 from utils import RandomRun
 from collections import OrderedDict
+from html_plots import EncoderPlot, WeightPlot
 
 random_inputs = False
+
+# if values are normalized before going into the voja rule
+normalize = True
 
 flavours = OrderedDict({"Banana":(1,2),
             "Peach":(4,4),
@@ -24,8 +28,16 @@ action_vocab = spa.Vocabulary(3, randomize=False)
 
 flavour_vocab = spa.Vocabulary(len(flavours), randomize=False)
 
-for f in flavours.keys():
-    flavour_vocab.add(f,len(flavours))
+keys = np.array([[1,0,0,0],
+          [0,1,0,0],
+          [0,0,1,0],
+          [0,0,0,1],
+         ])
+
+for i, f in enumerate(flavours.keys()):
+    flavour_vocab.add(f,keys[i])
+#for f in flavours.keys():
+#    flavour_vocab.add(f,len(flavours))
 
 # Explore the environment and learn from it. 'Command' controls the desired position
 action_vocab.add('EXPLORE', [1,0,0])
@@ -135,6 +147,13 @@ def surface_to_env(x):
 
     return xp, yp
 
+def normalize(x):
+
+    if np.linalg.norm(x) > 0:
+        return x / np.linalg.norm(x)
+    else:
+        return x
+
 # temporary artificial basal ganglia
 # x[0]: control signal
 # x[[1,2]] : environment position
@@ -155,6 +174,9 @@ def control_flav(t, x):
 
 #intercept = (np.dot(keys, keys.T) - np.eye(num_items)).flatten().max()
 intercept = 0 # calculated from another script
+intercept = .70 # calculated from another script
+intercept_flav_to_loc = .7 # calculated from another script
+intercept_loc_to_flav = .5 #5.55111512313e-17 # calculated from another script
 
 with model:
     fl = FlavourLand(shape=shape, flavours=flavours, 
@@ -192,8 +214,8 @@ with model:
     #memory = nengo.Ensemble(n_neurons=200, dimensions=2, intercepts=[intercept]*200)
     
     #memory_loc = nengo.Ensemble(n_neurons=400, dimensions=4)
-    memory_loc = nengo.Ensemble(n_neurons=400, dimensions=4)
-    memory_flav = nengo.Ensemble(n_neurons=200, dimensions=4, intercepts=[intercept]*200)
+    memory_loc = nengo.Ensemble(n_neurons=400, dimensions=4, intercepts=[intercept_loc_to_flav]*400)
+    memory_flav = nengo.Ensemble(n_neurons=200, dimensions=4, intercepts=[intercept_flav_to_loc]*200)
     
     # Query a location to get a response for what flavour was there
     query_location = nengo.Node([0,0])
@@ -228,10 +250,17 @@ with model:
     nengo.Connection(model.query_flavour.output, control_node_flav[[5,6,7,8]], synapse=None)
 
     #conn_in_loc = nengo.Connection(control_node_loc, memory_loc, function=loc_to_surface, 
-    conn_in_loc = nengo.Connection(working_loc, memory_loc, function=loc_to_surface, 
-                                   learning_rule_type=voja_loc, synapse=None)
-    conn_in_flav = nengo.Connection(control_node_flav, memory_flav, 
-                                    learning_rule_type=voja_flav, synapse=None)
+    if normalize:
+        # NOTE: loc_to_surface already normalizes
+        conn_in_loc = nengo.Connection(working_loc, memory_loc, function=loc_to_surface, 
+                                       learning_rule_type=voja_loc, synapse=None)
+        conn_in_flav = nengo.Connection(control_node_flav, memory_flav, function=normalize,
+                                        learning_rule_type=voja_flav, synapse=None)
+    else:
+        conn_in_loc = nengo.Connection(working_loc, memory_loc, function=loc_to_surface, 
+                                       learning_rule_type=voja_loc, synapse=None)
+        conn_in_flav = nengo.Connection(control_node_flav, memory_flav, 
+                                        learning_rule_type=voja_flav, synapse=None)
 
     nengo.Connection(task, conn_in_loc.learning_rule, synapse=None, transform=-1)
     nengo.Connection(task, conn_in_flav.learning_rule, synapse=None, transform=-1)
@@ -333,7 +362,14 @@ with model:
     nengo.Connection(command, bg_node[[3,4]], synapse=None)
     nengo.Connection(scaled_recall_loc, bg_node[[5,6]], synapse=None)
     nengo.Connection(env[:2], bg_node[[7,8]], synapse=None)
-    nengo.Connection(query_loc_scaled, bg_node[[9,10]], synapse=None)
+    #nengo.Connection(query_loc_scaled, bg_node[[9,10]], synapse=None)
+    nengo.Connection(query_location, bg_node[[9,10]], synapse=None) #NOTE: this is not scaled yet
+    plot_flav = EncoderPlot(conn_in_flav)
+    plot_loc = EncoderPlot(conn_in_loc)
+
+def on_step(sim):
+    plot_flav.update(sim)
+    plot_loc.update(sim)
 
 # Do some data recording and save encoders/decoders here
 if __name__ == '__main__':
