@@ -61,14 +61,17 @@ def compute_velocity(x):
     elif ang_diff < -np.pi:
         ang_diff += 2*np.pi
 
-    ang_vel = ang_diff*.9
+    #ang_vel = ang_diff*.9
+    ang_vel = ang_diff*2.5
     if np.sqrt(x[0]**2+x[1]**2) < .001:
         lin_vel = 0
         ang_vel = 0
     elif abs(ang_diff) < np.pi/4.:
-        lin_vel = .6*np.sqrt(x[0]**2+x[1]**2)
+        #lin_vel = .6*np.sqrt(x[0]**2+x[1]**2)
+        lin_vel = 1.6*np.sqrt(x[0]**2+x[1]**2)
     elif abs(ang_diff) < np.pi/2.:
-        lin_vel = .4*np.sqrt(x[0]**2+x[1]**2)
+        #lin_vel = .4*np.sqrt(x[0]**2+x[1]**2)
+        lin_vel = .8*np.sqrt(x[0]**2+x[1]**2)
     else:
         lin_vel = 0
     
@@ -197,17 +200,17 @@ with model:
     ##location = nengo.Ensemble(n_neurons=300, dimensions=3)
 
     taste = nengo.Ensemble(n_neurons=10*len(flavours), dimensions=len(flavours), radius=1.2)
-
+    """
     # linear and angular velocity
     if random_inputs:
         velocity = nengo.Node(RandomRun())
     else:
         velocity = nengo.Node([0,0])
     nengo.Connection(velocity[:2], env[:2])
-
+    """
     #nengo.Connection(env[:3], location, function=scale_location)
-    scaled_loc = nengo.Node(size_in=3,size_out=3)
-    nengo.Connection(env[:3], scaled_loc, function=scale_location)
+    ##scaled_loc = nengo.Node(size_in=3,size_out=3)
+    ##nengo.Connection(env[:3], scaled_loc, function=scale_location)
 
     nengo.Connection(env[3:], taste)
 
@@ -225,8 +228,8 @@ with model:
     
     # Query a location to get a response for what flavour was there
     query_location = nengo.Node([0,0])
-    query_loc_scaled = nengo.Node(scale_xy_node, size_in=2, size_out=2)
-    nengo.Connection(query_location, query_loc_scaled, synapse=None)
+    #query_loc_scaled = nengo.Node(scale_xy_node, size_in=2, size_out=2)
+    #nengo.Connection(query_location, query_loc_scaled, synapse=None)
 
     cfg = nengo.Config(nengo.Ensemble)
     cfg[nengo.Ensemble].neuron_type=nengo.Direct()
@@ -258,12 +261,12 @@ with model:
     #conn_in_loc = nengo.Connection(control_node_loc, memory_loc, function=loc_to_surface, 
     if normalize:
         # NOTE: loc_to_surface already normalizes
-        conn_in_loc = nengo.Connection(working_loc, memory_loc, function=loc_to_surface, 
+        conn_in_loc = nengo.Connection(working_loc, memory_loc, function=loc_scale_to_surface, 
                                        learning_rule_type=voja_loc, synapse=None)
         conn_in_flav = nengo.Connection(control_node_flav, memory_flav, function=normalize,
                                         learning_rule_type=voja_flav, synapse=None)
     else:
-        conn_in_loc = nengo.Connection(working_loc, memory_loc, function=loc_to_surface, 
+        conn_in_loc = nengo.Connection(working_loc, memory_loc, function=loc_scale_to_surface, 
                                        learning_rule_type=voja_loc, synapse=None)
         conn_in_flav = nengo.Connection(control_node_flav, memory_flav, 
                                         learning_rule_type=voja_flav, synapse=None)

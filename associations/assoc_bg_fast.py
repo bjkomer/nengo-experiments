@@ -62,14 +62,14 @@ def compute_velocity(x):
     elif ang_diff < -np.pi:
         ang_diff += 2*np.pi
 
-    ang_vel = ang_diff*.9
+    ang_vel = ang_diff*2.5
     if np.sqrt(x[0]**2+x[1]**2) < .001:
         lin_vel = 0
         ang_vel = 0
     elif abs(ang_diff) < np.pi/4.:
-        lin_vel = .6*np.sqrt(x[0]**2+x[1]**2)
+        lin_vel = 1.6*np.sqrt(x[0]**2+x[1]**2)
     elif abs(ang_diff) < np.pi/2.:
-        lin_vel = .4*np.sqrt(x[0]**2+x[1]**2)
+        lin_vel = .8*np.sqrt(x[0]**2+x[1]**2)
     else:
         lin_vel = 0
     
@@ -183,7 +183,7 @@ def voja_inhib_func(t, x):
 intercept = 0 # calculated from another script
 intercept = .70 # calculated from another script
 intercept_flav_to_loc = .7 # calculated from another script
-intercept_loc_to_flav = .5 #5.55111512313e-17 # calculated from another script
+intercept_loc_to_flav = .8 #5.55111512313e-17 # calculated from another script
 
 with model:
     fl = FlavourLand(shape=shape, flavours=flavours, 
@@ -260,12 +260,12 @@ with model:
     #conn_in_loc = nengo.Connection(control_node_loc, memory_loc, function=loc_to_surface, 
     if normalize:
         # NOTE: loc_to_surface already normalizes
-        conn_in_loc = nengo.Connection(working_loc, memory_loc, function=loc_to_surface, 
+        conn_in_loc = nengo.Connection(working_loc, memory_loc, function=loc_scale_to_surface, 
                                        learning_rule_type=voja_loc, synapse=None)
         conn_in_flav = nengo.Connection(control_node_flav, memory_flav, function=normalize,
                                         learning_rule_type=voja_flav, synapse=None)
     else:
-        conn_in_loc = nengo.Connection(working_loc, memory_loc, function=loc_to_surface, 
+        conn_in_loc = nengo.Connection(working_loc, memory_loc, function=loc_scale_to_surface, 
                                        learning_rule_type=voja_loc, synapse=None)
         conn_in_flav = nengo.Connection(control_node_flav, memory_flav, 
                                         learning_rule_type=voja_flav, synapse=None)
