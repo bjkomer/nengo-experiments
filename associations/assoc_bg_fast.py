@@ -1,5 +1,6 @@
 # Associate place and flavour using the Voja learning rule
 # Learn the associations both ways simultaneously. Can query either location or flavour
+# this version has a bunch of stuff cut out/direct mode to run faster
 import nengo
 import nengo.spa as spa
 import numpy as np
@@ -196,7 +197,8 @@ with model:
     # x, y, th
     ##location = nengo.Ensemble(n_neurons=300, dimensions=3)
 
-    taste = nengo.Ensemble(n_neurons=10*len(flavours), dimensions=len(flavours), radius=1.2)
+    taste = nengo.Ensemble(n_neurons=10*len(flavours), dimensions=len(flavours),
+                           radius=1.2, neuron_type=nengo.Direct())
 
     # linear and angular velocity
     if random_inputs:
@@ -288,8 +290,8 @@ with model:
     nengo.Connection(env[3:], learning, transform=1*np.ones((1,len(flavours))))
 
     recall_flav = nengo.Ensemble(n_neurons=200, dimensions=len(flavours), neuron_type=nengo.Direct())
-    #recall_loc = nengo.Ensemble(n_neurons=400, dimensions=4, neuron_type=nengo.Direct())
-    recall_loc = nengo.Ensemble(n_neurons=400, dimensions=4, neuron_type=nengo.LIF())
+    recall_loc = nengo.Ensemble(n_neurons=400, dimensions=4, neuron_type=nengo.Direct())
+    #recall_loc = nengo.Ensemble(n_neurons=400, dimensions=4, neuron_type=nengo.LIF())
 
     conn_out_flav = nengo.Connection(memory_loc, recall_flav,
                                 learning_rule_type=nengo.PES(1e-3),

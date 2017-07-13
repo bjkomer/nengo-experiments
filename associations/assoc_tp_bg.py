@@ -7,7 +7,7 @@ import numpy as np
 from world import FlavourLand
 from utils import RandomRun
 from collections import OrderedDict
-from html_plots import EncoderPlot
+from html_plots import EncoderPlot, WeightPlot
 
 random_inputs = False
 
@@ -29,9 +29,18 @@ action_vocab = spa.Vocabulary(3, randomize=False)
 
 flavour_vocab = spa.Vocabulary(len(flavours), randomize=False)
 
+keys = np.array([[1,0,0,0],
+          [0,1,0,0],
+          [0,0,1,0],
+          [0,0,0,1],
+         ])
+
+for i, f in enumerate(flavours.keys()):
+    flavour_vocab.add(f,keys[i])
+"""
 for f in flavours.keys():
     flavour_vocab.add(f,len(flavours))
-
+"""
 # Explore the environment and learn from it. 'Command' controls the desired position
 action_vocab.add('EXPLORE', [1,0,0])
 
@@ -165,6 +174,12 @@ def control_flav(t, x):
     else:
         return x[1], x[2], x[3], x[4]
 
+def voja_inhib_func(t, x):
+    if x < -1:
+        return -1
+    else:
+        return x
+
 #intercept = (np.dot(keys, keys.T) - np.eye(num_items)).flatten().max()
 intercept_flav_to_loc = .7 # calculated from another script
 intercept_loc_to_flav = .5#5.55111512313e-17 # calculated from another script
@@ -257,20 +272,22 @@ with model:
         conn_in_flav = nengo.Connection(control_node_flav, memory_flav, 
                                         learning_rule_type=voja_flav, synapse=None)
 
-    nengo.Connection(task, conn_in_loc.learning_rule, synapse=None, transform=-1)
-    nengo.Connection(task, conn_in_flav.learning_rule, synapse=None, transform=-1)
-    
-    #conn_in = nengo.Connection(env[:3], memory, learning_rule_type=voja)
-    ##conn_in = nengo.Connection(env[:2], memory, learning_rule_type=voja)
+    # makes sure the voja learning connection only receives 0 (learning) or -1 (not learning) exactly
+    voja_inhib = nengo.Node(voja_inhib_func, size_in=1,size_out=1)
+
+    nengo.Connection(task, voja_inhib, synapse=None, transform=-1)
+
+    nengo.Connection(voja_inhib, conn_in_loc.learning_rule, synapse=None)
+    nengo.Connection(voja_inhib, conn_in_flav.learning_rule, synapse=None)
 
     # Try only learning when flavours present
-    #learning = nengo.Ensemble(n_neurons=100, dimensions=1)
     learning = nengo.Ensemble(n_neurons=100, dimensions=1, neuron_type=nengo.Direct())
     inhibition = nengo.Node([-1])
     nengo.Connection(inhibition, learning, synapse=None)
     
-    nengo.Connection(learning, conn_in_loc.learning_rule, synapse=None, transform=1)
-    nengo.Connection(learning, conn_in_flav.learning_rule, synapse=None, transform=1)
+    nengo.Connection(learning, voja_inhib, synapse=None, transform=1)
+    #nengo.Connection(learning, conn_in_loc.learning_rule, synapse=None, transform=1)
+    #nengo.Connection(learning, conn_in_flav.learning_rule, synapse=None, transform=1)
 
     nengo.Connection(env[3:], learning, transform=1*np.ones((1,len(flavours))))
 
@@ -284,6 +301,7 @@ with model:
                                )
     conn_out_loc = nengo.Connection(memory_flav, recall_loc,
                                 learning_rule_type=nengo.PES(1e-3),
+                                solver=nengo.solvers.LstsqL2(weights=True), # using this for the weights plot
                                 function=lambda x: np.random.random(4)
                                )
 
@@ -366,6 +384,9 @@ with model:
     plot_flav = EncoderPlot(conn_in_flav)
     plot_loc = EncoderPlot(conn_in_loc)
 
+    #weight_plot_loc = WeightPlot(conn_out_loc)
+
 def on_step(sim):
     plot_flav.update(sim)
     plot_loc.update(sim)
+    #weight_plot_loc.update(sim)
