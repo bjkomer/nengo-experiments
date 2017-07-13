@@ -15,7 +15,7 @@ automatic_inputs = True
 #random_inputs = False
 
 # If control is teleport style
-teleport = False
+teleport = True #False
 
 # if keys are normalized before going into the voja rule
 normalize_keys = True
@@ -189,7 +189,7 @@ with model:
     nengo.Connection(env[3:], learning, transform=1*np.ones((1,len(flavours_A))))
 
     recall_flav = nengo.Ensemble(n_neurons=200, dimensions=len(flavours_A), neuron_type=nengo.Direct())
-    recall_loc = nengo.Ensemble(n_neurons=400, dimensions=4, neuron_type=nengo.LIF())
+    recall_loc = nengo.Ensemble(n_neurons=400, dimensions=4, neuron_type=nengo.Direct()) #neuron_type=nengo.LIF())
     recall_room = nengo.Ensemble(n_neurons=150, dimensions=len(rooms), neuron_type=nengo.Direct())
 
     # The room that the agent believes it is in based on exploration
@@ -241,10 +241,8 @@ with model:
     scaled_recall_loc = nengo.Node(env_scale_node, size_in=2, size_out=2)
     nengo.Connection(recall_loc, scaled_recall_loc, function=surface_to_env)
 
-    #with nengo.Network() as control_system:
     vel_input = nengo.Ensemble(n_neurons=200, dimensions=2, neuron_type=nengo.Direct())
 
-    nengo.Connection(vel_input, env[[0,1]])
 
     #FIXME: switch this to LIF once its working
     pos_error = nengo.Ensemble(n_neurons=300, dimensions=3, neuron_type=nengo.Direct())
@@ -271,9 +269,10 @@ with model:
             # desired_pos=command
             # working_loc=query_loc_scaled
             # working_flav=query_flavour
-            # working_room=est_room
+            # working_room=est_room??
             # task=1 (learning off)
-            return x[3], x[4], x[9], x[10], x[15], x[16], x[17], x[18], x[22], x[23], x[24], 1
+            #return x[3], x[4], x[9], x[10], x[15], x[16], x[17], x[18], x[22], x[23], x[24], 1
+            return x[3], x[4], x[9], x[10], x[15], x[16], x[17], x[18], x[19], x[20], x[21], 1
         # action == FIND
         elif x[2] > .5:
             # desired_pos=scaled_recall_loc
@@ -314,6 +313,8 @@ with model:
         pos_input = nengo.Node(CycleInputs(rooms=rooms, period=.75))
         nengo.Connection(pos_input[[0,1]], env[[0,1]])
         nengo.Connection(pos_input[2:], model.current_room.input)
+    else:
+        nengo.Connection(vel_input, env[[0,1]])
 
 
     plot_flav = EncoderPlot(conn_in_flav)
