@@ -161,7 +161,7 @@ class TuningHeatMap(object):
 
 class EncoderPlot(nengo.Node):
 
-    def __init__(self, connection, ):
+    def __init__(self, connection, scaling='max'):
 
         self.connection = connection
 
@@ -171,37 +171,26 @@ class EncoderPlot(nengo.Node):
 
         self.encoders = None
 
-        #self.update_html()
+        self.scaling = scaling
 
         def plot(t):
             if self.encoders is None:
                 return
             plot._nengo_html_ = '<svg width="100%" height="100%" viewbox="0 0 100 100">'
             #mx = (np.max(self.encoders) + np.mean(self.encoders))/2.
-            mx = np.max(self.encoders)
-            if mx > 0:
-                self.encoders = self.encoders * (50. /mx)
+            if self.scaling == 'max':
+                mx = np.max(self.encoders)
+                if mx > 0:
+                    self.encoders = self.encoders * (50. /mx)
             for e in self.encoders:
+                if self.scaling == 'normalize':
+                    e /= np.linalg.norm(e)
+                    e *= 50
                 plot._nengo_html_ += '<circle cx="{0}" cy="{1}" r="{2}"  stroke-width="1.0" stroke="blue" fill="blue" />'.format(e[0]+50, e[1]+50, 1)
             plot._nengo_html_ += '</svg>'
 
         super(EncoderPlot, self).__init__(plot, size_in=0, size_out=0)
         self.output._nengo_html_ = '<svg width="100%" height="100%" viewbox="0 0 100 100"></svg>'
-
-    def update_html(self):
-
-        self._nengo_html_ = '<svg width="100%" height="100%" viewbox="0 0 100 100">'
-        #TODO: make sure this works
-        print(dir(self.ensemble.encoders))
-        print(dir(self.ensemble))
-        try:
-            for e in self.ensemble.encoders:
-                print(type(e))
-                self._nengo_html_ += '<circle cx="{0}" cy="{1}" r="{2}"  stroke-width="1.0" stroke="blue" fill="blue" />'.format(e[0], e[1], 1)
-        except:
-            pass
-
-        self._nengo_html_ += '</svg>'
 
     def update(self, sim):
         if sim is None:
@@ -210,8 +199,48 @@ class EncoderPlot(nengo.Node):
         self.encoders = sim._probe_outputs[self.encoder_probe][-1]
         del sim._probe_outputs[self.encoder_probe][:]
 
-    """
-    def __call__(self, t):
+class WeightPlot(nengo.Node):
+    def __init__(self, connection, scaling='max'):
 
-        self.update_html()
-    """
+        self.connection = connection
+
+        self.ensemble = connection.post_obj
+
+        self.weight_probe = nengo.Probe(connection, 'weights', sample_every=0.01)
+
+        self.weights = None
+
+        self.scaling = scaling
+
+        def plot(t):
+            if self.weights is None:
+                return
+            mn = np.min(self.weights)
+            mx = np.max(self.weights)
+            rn = mx-mn
+            self.weights = ((self.weights + mn)/rn)*255
+            values = self.weights.astype('uint8')
+            png = Image.fromarray(values)
+            buffer = cStringIO.StringIO()
+            png.save(buffer, format="PNG")
+            img_str = base64.b64encode(buffer.getvalue())
+            plot._nengo_html_ = '''
+                <svg width="100%%" height="100%%" viewbox="0 0 %s %s">''' % (self.weights.shape[1], self.weights.shape[0])
+            plot._nengo_html_ += '''
+                <image width="100%%" height="100%%"
+                       xlink:href="data:image/png;base64,%s"
+                       style="image-rendering: pixelated;">
+                </svg>''' % (''.join(img_str))
+
+        super(WeightPlot, self).__init__(plot, size_in=0, size_out=0)
+        self.output._nengo_html_ = '<svg width="100%" height="100%" viewbox="0 0 100 100"></svg>'
+
+    def update(self, sim):
+        if sim is None:
+            return
+        try:
+            self.weights = sim._probe_outputs[self.weight_probe][-1]
+            del sim._probe_outputs[self.weight_probe][:]
+        except:
+            self.weights = None
+
