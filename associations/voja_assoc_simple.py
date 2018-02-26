@@ -3,14 +3,15 @@ import nengo
 import numpy as np
 from world import FlavourLand
 from utils import RandomRun
+from collections import OrderedDict
 
 random_inputs = False
 
-flavours = {"Banana":(1,2),
+flavours = OrderedDict({"Banana":(1,2),
             "Peach":(4,4),
             "Lemon":(6,1),
             "Apple":(2,7)
-           }
+           })
 
 shape = (10,10)
 
@@ -68,7 +69,8 @@ def control(t, x):
 intercept = .001 # arbitrary for now
 
 with model:
-    fl = FlavourLand(shape=shape, flavours=flavours, motion_type='teleport')
+    fl = FlavourLand(shape=shape, flavours=flavours, 
+                     flavour_rad=.1, motion_type='teleport')
     env = nengo.Node(fl, size_in=3, size_out=3+len(flavours))
 
     #TODO: put in basal ganglia that switches between learning and recall modes
@@ -96,7 +98,8 @@ with model:
 
     #memory = nengo.Ensemble(n_neurons=300, dimensions=3)
     #memory = nengo.Ensemble(n_neurons=200, dimensions=2)
-    memory = nengo.Ensemble(n_neurons=400, dimensions=4)
+    #memory = nengo.Ensemble(n_neurons=400, dimensions=4)
+    memory = nengo.Ensemble(n_neurons=400, dimensions=4, intercepts=[0]*400)
     #memory = nengo.Ensemble(n_neurons=200, dimensions=2, intercepts=[intercept]*200)
     
     # Query a location to get a response for what flavour was there
@@ -145,8 +148,8 @@ with model:
     nengo.Connection(error, conn_out.learning_rule)
 
     # inhibit learning based on learning signal
-    nengo.Connection(learning, error.neurons, transform=[[10]] * 200, synapse=None)
-    nengo.Connection(task, error.neurons, transform=[[-10]] * 200, synapse=None)
+    nengo.Connection(learning, error.neurons, transform=[[3]] * 200, synapse=None)
+    nengo.Connection(task, error.neurons, transform=[[-3]] * 200, synapse=None)
 
 
     ##nengo.Connection(query, memory)

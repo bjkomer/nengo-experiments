@@ -149,7 +149,6 @@ class CycleInputs(object):
                 if self.cur_room == self.num_rooms:
                     self.cur_room = 0
 
-        #return [self.x, self.y, self.th] + self.f
         return [self.x, self.y] + self.room_vec
 
 def normalize(x):
@@ -200,7 +199,7 @@ with model:
     nengo.Connection(vec_to_scalar, env[-1], synapse=None)
 
     if mem_dim == 2:
-        multimodal = nengo.Ensemble(n_neurons=500, dimensions=2+len(flavours_A), neuron_tpye=nengo.Direct())
+        multimodal = nengo.Ensemble(n_neurons=500, dimensions=2+len(flavours_A), neuron_type=nengo.Direct())
         memory = nengo.Ensemble(n_neurons=500, dimensions=2+len(flavours_A), intercepts=[intercept]*500)
         nengo.Connection(env[[0,1]], multimodal[[0,1]], function=scale_location_xy)
         nengo.Connection(env[3:], multimodal[2:])

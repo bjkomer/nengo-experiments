@@ -189,7 +189,7 @@ intercept_loc_to_flav = .5 #5.55111512313e-17 # calculated from another script
 
 with model:
     fl = FlavourLand(shape=shape, flavours=flavours, 
-                     flavour_rad=.1, motion_type='velocity')
+                     flavour_rad=.2, motion_type='velocity')
     env = nengo.Node(fl, size_in=2, size_out=3+len(flavours))
 
     #TODO: put in basal ganglia that switches between learning and recall modes
@@ -292,7 +292,7 @@ with model:
 
     recall_flav = nengo.Ensemble(n_neurons=200, dimensions=len(flavours), neuron_type=nengo.Direct())
     #recall_loc = nengo.Ensemble(n_neurons=400, dimensions=4, neuron_type=nengo.Direct())
-    recall_loc = nengo.Ensemble(n_neurons=400, dimensions=4, neuron_type=nengo.LIF())
+    recall_loc = nengo.Ensemble(n_neurons=800, dimensions=4, neuron_type=nengo.LIF())
 
     conn_out_flav = nengo.Connection(memory_loc, recall_flav,
                                 learning_rule_type=nengo.PES(1e-3),

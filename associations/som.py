@@ -39,9 +39,11 @@ map_radius = 5
 
 lr_i = .5 # initial learning rate
 lr_f = .005 # final learning rate
+lr_f = .05 # final learning rate
 
 sigma_i = 10#10 # initial neighborhood parameter
 sigma_f = .01 # final neighborhood parameter
+sigma_f = .1 # final neighborhood parameter
 
 def dist_func(a,b):
     #return np.linalg.norm(a-b)

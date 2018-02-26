@@ -8,11 +8,32 @@ from world import FlavourLand, FlavourLandMultiRoom
 from utils import *
 from collections import OrderedDict
 from html_plots import EncoderPlot, WeightPlot
+import cPickle as pickle
+
+#TODO: get this to work properly in the future
 
 # If all inputs will cycle
-automatic_inputs = True
+automatic_inputs = False#True
 
 #random_inputs = False
+
+# Load in saved encoders and decoders
+load_enc_dec = True
+
+if load_enc_dec:
+    enc_dec = pickle.load(open('room_enc_dec.pkl','r'))
+
+    enc_flav = enc_dec['p_enc_flav']
+    enc_loc = enc_dec['p_enc_loc']
+    enc_room = enc_dec['p_enc_room']
+    
+    dec_flav = enc_dec['p_dec_flav']
+    dec_loc = enc_dec['p_dec_loc']
+    dec_room = enc_dec['p_dec_room']
+
+    dec_flav_solver = SpecifyDecoders(dec_flav)
+    dec_loc_solver = SpecifyDecoders(dec_loc)
+    dec_room_solver = SpecifyDecoders(dec_room)
 
 # If control is teleport style
 teleport = True #False
@@ -105,15 +126,29 @@ with model:
                                 dimensions=4+len(flavours_A)+len(rooms), 
                                 neuron_type=nengo.Direct())
     
-    # room + location to flavour
-    memory_rl_to_f = nengo.Ensemble(n_neurons=700, dimensions=4+len(rooms), 
-                                    intercepts=[intercept_loc_to_flav]*700)
-    # room + flavour to location
-    memory_rf_to_l = nengo.Ensemble(n_neurons=700, dimensions=len(flavours_A)+len(rooms), 
-                                    intercepts=[intercept_flav_to_loc]*700)
-    # location + flavour to room
-    memory_lf_to_r = nengo.Ensemble(n_neurons=700, dimensions=4+len(flavours_A), 
-                                    intercepts=[intercept_to_room]*700)
+    if load_enc_dec:
+        # room + location to flavour
+        memory_rl_to_f = nengo.Ensemble(n_neurons=700, dimensions=4+len(rooms),
+                                        encoders=enc_flav,
+                                        intercepts=[intercept_loc_to_flav]*700)
+        # room + flavour to location
+        memory_rf_to_l = nengo.Ensemble(n_neurons=700, dimensions=len(flavours_A)+len(rooms), 
+                                        encoders=enc_loc,
+                                        intercepts=[intercept_flav_to_loc]*700)
+        # location + flavour to room
+        memory_lf_to_r = nengo.Ensemble(n_neurons=700, dimensions=4+len(flavours_A), 
+                                        encoders=enc_room,
+                                        intercepts=[intercept_to_room]*700)
+    else:
+        # room + location to flavour
+        memory_rl_to_f = nengo.Ensemble(n_neurons=700, dimensions=4+len(rooms), 
+                                        intercepts=[intercept_loc_to_flav]*700)
+        # room + flavour to location
+        memory_rf_to_l = nengo.Ensemble(n_neurons=700, dimensions=len(flavours_A)+len(rooms), 
+                                        intercepts=[intercept_flav_to_loc]*700)
+        # location + flavour to room
+        memory_lf_to_r = nengo.Ensemble(n_neurons=700, dimensions=4+len(flavours_A), 
+                                        intercepts=[intercept_to_room]*700)
     
     # Query a location to get a response for what flavour was there
     query_location = nengo.Node([0,0])
@@ -147,7 +182,7 @@ with model:
     working_flav = nengo.Ensemble(n_neurons=200, dimensions=4, neuron_type=nengo.Direct())
     working_room = nengo.Ensemble(n_neurons=200, dimensions=3, neuron_type=nengo.Direct())
     
-    nengo.Connection(working_loc, multimodal[[0,1,2,3]], function=loc_to_surface, synapse=None)
+    nengo.Connection(working_loc, multimodal[[0,1,2,3]], function=loc_scale_to_surface, synapse=None)
     nengo.Connection(working_flav, multimodal[[4,5,6,7]], synapse=None)
     nengo.Connection(working_room, multimodal[[8,9,10]], synapse=None)
 
@@ -195,19 +230,39 @@ with model:
     # The room that the agent believes it is in based on exploration
     model.est_room = spa.State(len(rooms), vocab=room_vocab, feedback=1)
     nengo.Connection(recall_room, model.est_room.input) #TODO: make sure this is correct
-
-    conn_out_flav = nengo.Connection(memory_rl_to_f, recall_flav,
-                                learning_rule_type=nengo.PES(1e-3),
-                                function=lambda x: np.random.random(len(flavours_A))
-                               )
-    conn_out_loc = nengo.Connection(memory_rf_to_l, recall_loc,
-                                learning_rule_type=nengo.PES(1e-3),
-                                function=lambda x: np.random.random(4)
-                               )
-    conn_out_room = nengo.Connection(memory_lf_to_r, recall_room,
-                                learning_rule_type=nengo.PES(1e-3),
-                                function=lambda x: np.random.random(len(rooms))
-                               )
+ 
+    if load_enc_dec:
+        conn_out_flav = nengo.Connection(memory_rl_to_f.neurons, recall_flav,
+                                    learning_rule_type=nengo.PES(1e-3),
+                                    #solver=dec_flav_solver,
+                                    transform=dec_flav,
+                                    #function=lambda x: np.random.random(len(flavours_A))
+                                   )
+        conn_out_loc = nengo.Connection(memory_rf_to_l.neurons, recall_loc,
+                                    learning_rule_type=nengo.PES(1e-3),
+                                    #solver=dec_loc_solver,
+                                    transform=dec_loc,
+                                    #function=lambda x: np.random.random(4)
+                                   )
+        conn_out_room = nengo.Connection(memory_lf_to_r.neurons, recall_room,
+                                    learning_rule_type=nengo.PES(1e-3),
+                                    #solver=dec_room_solver,
+                                    transform=dec_room,
+                                    #function=lambda x: np.random.random(len(rooms))
+                                   )
+    else:
+        conn_out_flav = nengo.Connection(memory_rl_to_f, recall_flav,
+                                    learning_rule_type=nengo.PES(1e-3),
+                                    function=lambda x: np.random.random(len(flavours_A))
+                                   )
+        conn_out_loc = nengo.Connection(memory_rf_to_l, recall_loc,
+                                    learning_rule_type=nengo.PES(1e-3),
+                                    function=lambda x: np.random.random(4)
+                                   )
+        conn_out_room = nengo.Connection(memory_lf_to_r, recall_room,
+                                    learning_rule_type=nengo.PES(1e-3),
+                                    function=lambda x: np.random.random(len(rooms))
+                                   )
 
     error_flav = nengo.Ensemble(n_neurons=200, dimensions=len(flavours_A))
     error_loc = nengo.Ensemble(n_neurons=400, dimensions=4)
@@ -237,6 +292,10 @@ with model:
     
     nengo.Connection(learning, error_room.neurons, transform=[[3]] * 150, synapse=None)
     nengo.Connection(task, error_room.neurons, transform=[[-3]] * 150, synapse=None)
+    
+    # If any action besides the default 'LEARN' is chosen, inhibit the error population
+    nengo.Connection(model.action.output, error_room.neurons, transform=[[-3,-3,-3]] * 150, synapse=None)
+    nengo.Connection(model.action.output, voja_inhib, transform=[[-1,-1,-1]], synapse=None)
 
     scaled_recall_loc = nengo.Node(env_scale_node, size_in=2, size_out=2)
     nengo.Connection(recall_loc, scaled_recall_loc, function=surface_to_env)
@@ -271,8 +330,8 @@ with model:
             # working_flav=query_flavour
             # working_room=est_room??
             # task=1 (learning off)
-            #return x[3], x[4], x[9], x[10], x[15], x[16], x[17], x[18], x[22], x[23], x[24], 1
-            return x[3], x[4], x[9], x[10], x[15], x[16], x[17], x[18], x[19], x[20], x[21], 1
+            return x[3], x[4], x[9], x[10], x[15], x[16], x[17], x[18], x[22], x[23], x[24], 1
+            #return x[3], x[4], x[9], x[10], x[15], x[16], x[17], x[18], x[19], x[20], x[21], 1
         # action == FIND
         elif x[2] > .5:
             # desired_pos=scaled_recall_loc
@@ -314,7 +373,10 @@ with model:
         nengo.Connection(pos_input[[0,1]], env[[0,1]])
         nengo.Connection(pos_input[2:], model.current_room.input)
     else:
-        nengo.Connection(vel_input, env[[0,1]])
+        if teleport:
+            nengo.Connection(command, env[[0,1]])
+        else:
+            nengo.Connection(vel_input, env[[0,1]])
 
 
     plot_flav = EncoderPlot(conn_in_flav)
@@ -329,5 +391,27 @@ def on_step(sim):
 # Do some data recording and save encoders/decoders here
 if __name__ == '__main__':
     with model:
-        pass
-    print("test")
+        p_enc_flav = nengo.Probe(memory_rl_to_f, 'scaled_encoders')
+        p_enc_loc = nengo.Probe(memory_rf_to_l, 'scaled_encoders')
+        p_enc_room = nengo.Probe(memory_lf_to_r, 'scaled_encoders')
+        
+        p_dec_flav = nengo.Probe(conn_out_flav, 'weights')
+        p_dec_loc = nengo.Probe(conn_out_loc, 'weights')
+        p_dec_room = nengo.Probe(conn_out_room, 'weights')
+        #p_dec_flav = nengo.Probe(memory_rl_to_f, 'weights')
+        #p_dec_loc = nengo.Probe(memory_rf_to_l, 'weights')
+        #p_dec_room = nengo.Probe(memory_lf_to_r, 'weights')
+
+    print("Starting Simulator")
+    with nengo.Simulator(model) as sim:
+        sim.run(.75*4*3*4)
+
+    print("Saving Encoders and Decoders")
+    pickle.dump({'p_enc_flav':sim.data[p_enc_flav][-1].copy(),
+                 'p_enc_loc':sim.data[p_enc_loc][-1].copy(),
+                 'p_enc_room':sim.data[p_enc_room][-1].copy(),
+                 'p_dec_flav':sim.data[p_dec_flav][-1].copy(),
+                 'p_dec_loc':sim.data[p_dec_loc][-1].copy(),
+                 'p_dec_room':sim.data[p_dec_room][-1].copy(),
+                },open('room_enc_dec.pkl','w'))
+

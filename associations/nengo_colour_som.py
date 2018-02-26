@@ -13,9 +13,10 @@ def dist_func(a,b):
     return d
 
 class SOM(object):
-    def __init__(self, n, lr_i=0.5, lr_f=0.005, sigma_i=10, sigma_f=0.01):
+    def __init__(self, n, weight_dim=3, lr_i=0.5, lr_f=0.005, sigma_i=10, sigma_f=0.01):
         self.n = n
-        self.neurons = np.random.rand(n,n,3)
+        self.weight_dim = weight_dim
+        self.neurons = np.random.rand(n,n,weight_dim)
 
         self.lr_i = lr_i
         self.lr_f = lr_f
@@ -37,6 +38,9 @@ class SOM(object):
         index = np.argmax(d)
         return (index/self.n, index%self.n)
 
+    def calc_dist(self, best_index, x, y):
+        return np.sqrt((best_index[0]-x)**2+(best_index[1]-y)**2)
+
     def update_neurons(self, vec):
         best_index = self.get_best_match(vec)
         """
@@ -55,7 +59,8 @@ class SOM(object):
 
         for x in range(self.n):
             for y in range(self.n):
-                dist = np.sqrt((best_index[0]-x)**2+(best_index[1]-y)**2)
+                dist = self.calc_dist(best_index, x, y)
+                #np.sqrt((best_index[0]-x)**2+(best_index[1]-y)**2)
                 
                 influence = np.exp(-dist**2/(self.sigma**2))
                 
@@ -81,8 +86,62 @@ class SOM(object):
         self.update_neurons(x)
         self.update_html()
 
-palette = sns.color_palette()
-palette = sns.hls_palette(8, l=.3, s=.8)
+class CyclicSOM(SOM):
+
+    def calc_dist(self, best_index, x, y):
+        return min(np.sqrt((best_index[0]-x)**2+(best_index[1]-y)**2),
+                   np.sqrt((best_index[0]-x-self.n)**2+(best_index[1]-y)**2),
+                   np.sqrt((best_index[0]-x+self.n)**2+(best_index[1]-y)**2),
+                   np.sqrt((best_index[0]-x)**2+(best_index[1]-y-self.n)**2),
+                   np.sqrt((best_index[0]-x)**2+(best_index[1]-y+self.n)**2),
+                   np.sqrt((best_index[0]-x+self.n)**2+(best_index[1]-y+self.n)**2),
+                   np.sqrt((best_index[0]-x-self.n)**2+(best_index[1]-y+self.n)**2),
+                   np.sqrt((best_index[0]-x+self.n)**2+(best_index[1]-y-self.n)**2),
+                   np.sqrt((best_index[0]-x-self.n)**2+(best_index[1]-y-self.n)**2),
+                  )
+
+class DSOM(SOM):
+
+    def __init__(self, elasticity=1.75, *args, **kwargs):
+
+        super(DSOM, self).__init__(*args, **kwargs)
+
+        self.elasticity = elasticity
+        self.max = 0
+    
+    def update_neurons(self, vec):
+        
+        D = ((self.neurons - vec)**2).sum(axis=-1)
+        
+        best_index = self.get_best_match(vec)
+
+        self.max = max(D.max(), self.max)
+        d = np.sqrt(D/self.max)
+        self.sigma = self.elasticity*d[best_index]
+        
+        for x in range(self.n):
+            for y in range(self.n):
+                dist = self.calc_dist(best_index, x, y)
+                
+                influence = np.exp(-dist**2/(self.sigma**2))
+                
+                self.neurons[y,x,:] += self.lr * d[y,x] * influence * (vec - self.neurons[y,x,:])
+
+class CyclicDSOM(DSOM):
+    
+    def calc_dist(self, best_index, x, y):
+        return min(np.sqrt((best_index[0]-x)**2+(best_index[1]-y)**2),
+                   np.sqrt((best_index[0]-x-self.n)**2+(best_index[1]-y)**2),
+                   np.sqrt((best_index[0]-x+self.n)**2+(best_index[1]-y)**2),
+                   np.sqrt((best_index[0]-x)**2+(best_index[1]-y-self.n)**2),
+                   np.sqrt((best_index[0]-x)**2+(best_index[1]-y+self.n)**2),
+                   np.sqrt((best_index[0]-x+self.n)**2+(best_index[1]-y+self.n)**2),
+                   np.sqrt((best_index[0]-x-self.n)**2+(best_index[1]-y+self.n)**2),
+                   np.sqrt((best_index[0]-x+self.n)**2+(best_index[1]-y-self.n)**2),
+                   np.sqrt((best_index[0]-x-self.n)**2+(best_index[1]-y-self.n)**2),
+                  )
+    
+
 class ColourInput(object):
 
     def __init__(self, palette):
@@ -111,6 +170,8 @@ class ColourInput(object):
 
         return self.colour
 
+palette = sns.color_palette()
+#palette = sns.hls_palette(8, l=.3, s=.8)
 
 model = nengo.Network()
 
@@ -118,7 +179,11 @@ with model:
     colour_input = nengo.Node(ColourInput(palette), size_in=0, size_out=3)
 
     #s = SOM(n=8)
-    s = SOM(n=8,sigma_f=2)
+    #s = SOM(n=8,sigma_f=2) # this one works nice
+    #s = SOM(n=16,sigma_f=4, lr_f=0.01)
+    #s = CyclicSOM(n=16,sigma_f=4, lr_f=0.01)
+    #s = DSOM(n=16, lr_i=.1)
+    s = CyclicDSOM(n=8, lr_i=.1)
     som = nengo.Node(s, size_in=3, size_out=0)
 
     nengo.Connection(colour_input, som)

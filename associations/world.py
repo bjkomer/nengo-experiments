@@ -127,7 +127,7 @@ class FlavourLand(object):
 
         self.update_html()
         
-    def update_html(self, body_scale=1):
+    def update_html(self, body_scale=0.5):
         # Define points of the triangular agent based on x, y, and th
         x1 = (self.x + body_scale*0.5*np.cos(self.th - 2*np.pi/3))*self.scale_x
         y1 = 100-(self.y + body_scale*0.5*np.sin(self.th - 2*np.pi/3))*self.scale_y
