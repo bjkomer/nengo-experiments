@@ -1,6 +1,18 @@
 # Associate place and item using the Voja learning rule
 # Learn the associations both ways simultaneously. Can query either location or item
 # this version has a bunch of stuff cut out/direct mode to run faster
+
+# TODO: at 'test time' query an item, which will give a location,
+#       slowly move the location query from the current location to that items location
+#       this can be done by taking the vector difference as the direction, and using a
+#       unit velocity vector for movement in that direction. Could also use the distance
+#       directly and have it saturate
+#       this simulates the 'scanning' across the map
+#       stop once the recalled item is close enough to the queried item
+#       log the time that it takes, and repeat the experiment for a bunch of pairs
+
+# TODO: make more populations use neurons
+
 import nengo
 import nengo.spa as spa
 import numpy as np
