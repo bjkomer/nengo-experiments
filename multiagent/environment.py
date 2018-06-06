@@ -2,6 +2,7 @@ import nengo
 import redis
 import scipy.ndimage
 import numpy as np
+import seaborn as sns
 from gym_maze.envs.generators import RandomBlockMazeGenerator
 
 # TODO: make env class that can have arbitrary number of agents
@@ -54,6 +55,8 @@ def get_collision_coord(map_array, x, y, th,
         # Move one unit in the direction of the sensor
         cx += dx
         cy += dy
+        cx = np.clip(cx, 0, map_array.shape[0] - 1)
+        cy = np.clip(cy, 0, map_array.shape[1] - 1)
         if map_array[int(cx), int(cy)] == 1:
             return i
 
@@ -78,6 +81,8 @@ class MultiAgentEnvironment(object):
 
         self.agent_ids = []
 
+        self.agent_colours = sns.color_palette('hls', 8)
+
         # Parameters of each agent, with ids as keys
         self.agent_params = {}
         
@@ -88,6 +93,9 @@ class MultiAgentEnvironment(object):
         self.agent_act = {}
 
         self.r = redis.StrictRedis('localhost', db=0)
+        
+        # Clear any data from a previous run
+        self.r.flushdb()
         
         # Set up svg element templates to be filled in later
         self.tile_template = '<rect x={0} y={1} width=1 height=1 style="fill:black"/>'
@@ -101,8 +109,7 @@ class MultiAgentEnvironment(object):
     
     def colour_from_id(self, agent_id):
 
-        # TODO: implement this function
-        return 128, 128, 128
+        return np.array(self.agent_colours[agent_id % len(self.agent_colours)])*255
 
     def _generate_map(self):
         """
@@ -146,9 +153,16 @@ class MultiAgentEnvironment(object):
             #self.x += np.cos(self.th) * v[0] * self.dt 
             #self.y += np.sin(self.th) * v[0] * self.dt 
             self.agent_obs[agent_id][2] += ang_vel * self.dt
+            if self.agent_obs[agent_id][2] > 2*np.pi:
+                self.agent_obs[agent_id][2] -= 2*np.pi
+            elif self.agent_obs[agent_id][2] < -2*np.pi:
+                self.agent_obs[agent_id][2] += 2*np.pi
             th = self.agent_obs[agent_id][2]
+
             self.agent_obs[agent_id][0] += np.cos(th) * lin_vel * self.dt 
             self.agent_obs[agent_id][1] += np.sin(th) * lin_vel * self.dt
+            self.agent_obs[agent_id][0] = np.clip(self.agent_obs[agent_id][0], 1, self.size - 1)
+            self.agent_obs[agent_id][1] = np.clip(self.agent_obs[agent_id][1], 1, self.size - 1)
             x = self.agent_obs[agent_id][0]
             y = self.agent_obs[agent_id][1]
 
@@ -169,7 +183,9 @@ class MultiAgentEnvironment(object):
                 th=th,
                 max_sensor_dist=max_sensor_dist,
             )
-            self.agent_obs[agent_id][3:] = sensor_dists
+
+            # normalize the returned sensor distances
+            self.agent_obs[agent_id][3:] = sensor_dists / max_sensor_dist
             ang_interval = fov_rad / n_sensors
             start_ang = -fov_rad/2. + th
             
@@ -181,11 +197,12 @@ class MultiAgentEnvironment(object):
                 svg += ''.join(lines)
 
             svg += agent_svg
-            svg += '</svg>'
             
-            output_key = 'agent_observation:{0}'.format(agent_id)
+            output_key = 'agent_obs:{0}'.format(agent_id)
             #self.r.set(output_key, self.agent_obs[agent_id])
             self.r.set(output_key, self.agent_obs[agent_id].ravel().tostring())
+
+        svg += '</svg>'
 
         self._nengo_html_ = svg
 
@@ -232,7 +249,11 @@ with model:
     map_selector = nengo.Node([0])
 
     env = nengo.Node(
-        MultiAgentEnvironment(size=20, dt=0.01),
+        MultiAgentEnvironment(
+            size=20,
+            dt=0.01,
+            show_distances=False,
+        ),
         size_in=1,
         size_out=0,
     )

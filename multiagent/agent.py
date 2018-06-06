@@ -5,20 +5,24 @@ import redis
 from functools import partial
 #from multiprocessing import Process
 
-parser = argparse.ArgumentParser("Generate a Nengo agent to interact in a common environment")
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser("Generate a Nengo agent to interact in a common environment")
 
-parser.add_argument('--agent-id', type=int, default=0)
-parser.add_argument('--fov', type=float, default=90, help='field of view of distance sensors, in degrees')
-parser.add_argument('--n-sensors', type=int, default=5, help='number of distance sensors')
-parser.add_argument('--top-speed', type=int, default=2, help='maximum speed of the agent')
-parser.add_argument('--max-sensor-dist', type=int, default=5, help='maximum sensor reading')
+    parser.add_argument('--agent-id', type=int, default=0)
+    parser.add_argument('--fov', type=float, default=180, help='field of view of distance sensors, in degrees')
+    parser.add_argument('--n-sensors', type=int, default=20, help='number of distance sensors')
+    parser.add_argument('--top-speed', type=int, default=2, help='maximum speed of the agent')
+    parser.add_argument('--max-sensor-dist', type=int, default=5, help='maximum sensor reading')
 
-args = parser.parse_args()
+    args = parser.parse_args()
+else:
+    print("Running in GUI, using default parameters")
+    args = argparse.Namespace(agent_id=0, fov=180, n_sensors=20, top_speed=2, max_sensor_dist=5)
 
 model = nengo.Network(seed=args.agent_id)
 
 def sense_to_ang_vel(x, n_sensors):
-        
+
     rotation_weights = np.linspace(-1, 1, n_sensors)
 
     return np.dot(rotation_weights, np.array(x))
@@ -76,6 +80,7 @@ class EnvironmentInterface(object):
 
 control_func = partial(sense_to_ang_vel, n_sensors=args.n_sensors)
 
+model.config[nengo.Ensemble].neuron_type=nengo.Direct()
 with model:
     angular_velocity = nengo.Ensemble(n_neurons=50, dimensions=1)
     linear_velocity = nengo.Ensemble(n_neurons=50, dimensions=1)
@@ -104,8 +109,9 @@ with model:
     nengo.Connection(linear_velocity, environment[0], synapse=None)
     nengo.Connection(angular_velocity, environment[1], synapse=None)
 
-sim = nengo.Simulator(model)
+if __name__ == '__main__':
+    sim = nengo.Simulator(model)
 
-# Run until killed
-while True:
-    sim.run(10)
+    # Run until killed
+    while True:
+        sim.run(10)
